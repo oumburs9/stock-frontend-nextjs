@@ -2,16 +2,20 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { authService } from "@/lib/services/auth.service"
-import { useRouter } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import type { LoginRequest, ChangePasswordRequest } from "@/lib/types/auth"
 
 export function useAuth() {
   const router = useRouter()
+  const pathname = usePathname()
   const queryClient = useQueryClient()
+  
+  const shouldFetchUser = pathname !== "/login"
 
   const { data: user, isLoading } = useQuery({
     queryKey: ["currentUser"],
     queryFn: () => authService.getCurrentUser(),
+    enabled: shouldFetchUser,
     retry: false,
   })
 

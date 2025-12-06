@@ -3,6 +3,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { roleService } from "@/lib/services/role.service"
 import type { CreateRoleRequest, UpdateRoleRequest } from "@/lib/types/role"
+import { Permission } from "../types/permission"
 
 export function useRoles() {
   return useQuery({
@@ -53,9 +54,9 @@ export function useDeleteRole() {
 }
 
 export function useRolePermissions(id: string | null) {
-  return useQuery({
+  return useQuery<Permission[]>({
     queryKey: ["roles", id, "permissions"],
-    queryFn: () => (id ? roleService.getRolePermissions(id) : null),
+    queryFn: () => (id ? roleService.getRolePermissions(id) : Promise.resolve([])),
     enabled: !!id,
   })
 }

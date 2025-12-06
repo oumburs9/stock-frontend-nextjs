@@ -1,4 +1,6 @@
 import type { Permission, CreatePermissionRequest, UpdatePermissionRequest } from "@/lib/types/permission"
+import { axiosInstance } from "../api/axios-instance"
+import { API_ENDPOINTS } from "../config/api.config"
 
 // ============================================================================
 // MOCK DATA
@@ -21,7 +23,7 @@ class PermissionService {
   // PRODUCTION API METHODS (commented out - uncomment to use real API)
   // ============================================================================
 
-  /*
+   
   async getPermissions(): Promise<Permission[]> {
     const response = await axiosInstance.get<Permission[]>(API_ENDPOINTS.permissions.list)
     return response.data
@@ -53,12 +55,12 @@ class PermissionService {
   async deletePermission(id: string): Promise<void> {
     await axiosInstance.delete(API_ENDPOINTS.permissions.detail(id))
   }
-  */
+
 
   // ============================================================================
   // MOCK METHODS (currently active - comment out when using real API)
   // ============================================================================
-
+/*
   async getPermissions(): Promise<Permission[]> {
     await new Promise((resolve) => setTimeout(resolve, 500))
     return MOCK_PERMISSIONS
@@ -92,6 +94,7 @@ class PermissionService {
     await new Promise((resolve) => setTimeout(resolve, 500))
     MOCK_PERMISSIONS = MOCK_PERMISSIONS.filter((p) => p.id !== id)
   }
+      */
 }
 
 export const permissionService = new PermissionService()

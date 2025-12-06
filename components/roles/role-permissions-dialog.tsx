@@ -34,7 +34,7 @@ export function RolePermissionsDialog({ role, open, onOpenChange }: RolePermissi
 
   useEffect(() => {
     if (rolePermissions) {
-      setSelectedPermissions(rolePermissions)
+      setSelectedPermissions(rolePermissions.map(p => p.id))
     } else {
       setSelectedPermissions([])
     }
@@ -47,14 +47,15 @@ export function RolePermissionsDialog({ role, open, onOpenChange }: RolePermissi
       permission.description?.toLowerCase().includes(searchQuery.toLowerCase()),
   )
 
-  const handleToggle = (permissionName: string) => {
+  const handleToggle = (permissionId: string) => {
     setSelectedPermissions((prev) =>
-      prev.includes(permissionName) ? prev.filter((p) => p !== permissionName) : [...prev, permissionName],
+      prev.includes(permissionId) ? prev.filter((p) => p !== permissionId) : [...prev, permissionId],
     )
   }
 
   const handleSubmit = () => {
     if (role) {
+      console.log('rool', role)
       updateMutation.mutate(
         {
           id: role.id,
@@ -95,8 +96,8 @@ export function RolePermissionsDialog({ role, open, onOpenChange }: RolePermissi
               <div key={permission.id} className="flex items-start space-x-3 p-2 rounded-md hover:bg-muted">
                 <Checkbox
                   id={permission.id}
-                  checked={selectedPermissions.includes(permission.name)}
-                  onCheckedChange={() => handleToggle(permission.name)}
+                  checked={selectedPermissions.includes(permission.id)}
+                  onCheckedChange={() => handleToggle(permission.id)}
                 />
                 <div className="flex-1">
                   <Label htmlFor={permission.id} className="font-mono text-sm cursor-pointer">

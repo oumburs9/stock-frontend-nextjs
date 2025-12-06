@@ -14,6 +14,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { ConfirmDeleteDialog } from "@/components/shared/confirm-delete-dialog"
 import { PermissionFormDialog } from "./permission-form-dialog"
 import type { Permission } from "@/lib/types/permission"
 
@@ -21,6 +22,7 @@ export function PermissionTable() {
   const [search, setSearch] = useState("")
   const [selectedPermission, setSelectedPermission] = useState<Permission | null>(null)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [permissionToDelete, setPermissionToDelete] = useState<Permission | null>(null)
 
   const { data: permissions, isLoading } = usePermissions()
   const deleteMutation = useDeletePermission()
@@ -36,9 +38,19 @@ export function PermissionTable() {
     setIsDialogOpen(true)
   }
 
-  const handleDelete = (id: string) => {
-    if (confirm("Are you sure you want to delete this permission?")) {
-      deleteMutation.mutate(id)
+  // const handleDelete = (id: string) => {
+  //   if (confirm("Are you sure you want to delete this permission?")) {
+  //     deleteMutation.mutate(id)
+  //   }
+  // }
+
+  const handleDelete = (permission: Permission) => {
+    setPermissionToDelete(permission)
+  }
+
+  const confirmDelete = () => {
+    if (permissionToDelete) {
+      deleteMutation.mutate(permissionToDelete.id)
     }
   }
 
@@ -104,7 +116,7 @@ export function PermissionTable() {
                         <DropdownMenuSeparator />
                         <DropdownMenuItem onClick={() => handleEdit(permission)}>Edit</DropdownMenuItem>
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={() => handleDelete(permission.id)} className="text-destructive">
+                        <DropdownMenuItem onClick={() => handleDelete(permission)} className="text-destructive">
                           Delete
                         </DropdownMenuItem>
                       </DropdownMenuContent>
@@ -118,6 +130,14 @@ export function PermissionTable() {
       </div>
 
       <PermissionFormDialog permission={selectedPermission} open={isDialogOpen} onOpenChange={setIsDialogOpen} />
+      <ConfirmDeleteDialog
+        open={!!permissionToDelete}
+        onOpenChange={(open) => !open && setPermissionToDelete(null)}
+        onConfirm={confirmDelete}
+        title="Delete Permission"
+        description="Are you sure you want to delete this permission? This permission will be removed from all roles."
+        itemName={permissionToDelete?.name}
+      />
     </div>
   )
 }

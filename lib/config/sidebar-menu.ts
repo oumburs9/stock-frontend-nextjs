@@ -20,11 +20,16 @@ export const sidebarMenu: MenuItem[] = [
     label: "Access Control",
     icon: Shield,
     collapsible: true,
-    permission: "access-control:view",
+    permission: null,
     children: [
-      { label: "Users", icon: Users, path: "/users", permission: "user:view" },
-      { label: "Roles", icon: KeyRound, path: "/roles", permission: "role:view" },
-      { label: "Permissions", icon: KeyRound, path: "/permissions", permission: "permission:view" },
+      { label: "Users", icon: Users, path: "/users", permission: null },
+      { label: "Roles", icon: KeyRound, path: "/roles", permission: null},
+      { label: "Permissions", icon: KeyRound, path: "/permissions", permission: null },
+    // permission: "access-control:view",
+    // children: [
+    //   { label: "Users", icon: Users, path: "/users", permission: "user:view" },
+    //   { label: "Roles", icon: KeyRound, path: "/roles", permission: "role:view" },
+    //   { label: "Permissions", icon: KeyRound, path: "/permissions", permission: "permission:view" },
     ],
   },
   {

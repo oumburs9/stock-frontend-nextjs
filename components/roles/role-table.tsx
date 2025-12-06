@@ -14,6 +14,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { ConfirmDeleteDialog } from "@/components/shared/confirm-delete-dialog"
 import { RoleFormDialog } from "./role-form-dialog"
 import { RolePermissionsDialog } from "./role-permissions-dialog"
 import type { Role } from "@/lib/types/role"
@@ -23,6 +24,7 @@ export function RoleTable() {
   const [selectedRole, setSelectedRole] = useState<Role | null>(null)
   const [isFormDialogOpen, setIsFormDialogOpen] = useState(false)
   const [isPermissionsDialogOpen, setIsPermissionsDialogOpen] = useState(false)
+  const [roleToDelete, setRoleToDelete] = useState<Role | null>(null)
 
   const { data: roles, isLoading } = useRoles()
   const deleteMutation = useDeleteRole()
@@ -43,11 +45,20 @@ export function RoleTable() {
     setIsPermissionsDialogOpen(true)
   }
 
-  const handleDelete = (id: string) => {
-    if (confirm("Are you sure you want to delete this role?")) {
-      deleteMutation.mutate(id)
+  const handleDelete = (role: Role) => {
+      setRoleToDelete(role)
     }
-  }
+  // const handleDelete = (id: string) => {
+  //   if (confirm("Are you sure you want to delete this role?")) {
+  //     deleteMutation.mutate(id)
+  //   }
+  // }
+
+    const confirmDelete = () => {
+      if (roleToDelete) {
+        deleteMutation.mutate(roleToDelete.id)
+      }
+    }
 
   return (
     <div className="space-y-4">
@@ -119,7 +130,7 @@ export function RoleTable() {
                           Manage Permissions
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={() => handleDelete(role.id)} className="text-destructive">
+                        <DropdownMenuItem onClick={() => handleDelete(role)} className="text-destructive">
                           Delete
                         </DropdownMenuItem>
                       </DropdownMenuContent>
@@ -138,6 +149,14 @@ export function RoleTable() {
         open={isPermissionsDialogOpen}
         onOpenChange={setIsPermissionsDialogOpen}
       />
+      <ConfirmDeleteDialog
+        open={!!roleToDelete}
+        onOpenChange={(open) => !open && setRoleToDelete(null)}
+        onConfirm={confirmDelete}
+        title="Delete Role"
+        description="Are you sure you want to delete this role? All users with this role will lose their associated permissions."
+        itemName={roleToDelete?.name}
+      />
     </div>
   )
 }
@@ -145,20 +164,20 @@ export function RoleTable() {
 function RolePermissionsList({ roleId }: { roleId: string }) {
   const { data: permissions } = useRoles()
   const rolePermissions = useRolePermissions(roleId)
-
+  
   if (rolePermissions.isLoading) {
     return <span className="text-xs text-muted-foreground">Loading...</span>
   }
-
+  
   if (!rolePermissions.data || rolePermissions.data.length === 0) {
     return <span className="text-xs text-muted-foreground">No permissions</span>
   }
 
   return (
     <div className="flex flex-wrap gap-1">
-      {rolePermissions.data.map((permission) => (
-        <span key={permission} className="px-2 py-0.5 bg-primary/10 text-primary rounded text-xs font-mono">
-          {permission}
+      {rolePermissions.data?.map((permission) => (
+        <span key={permission.id} className="px-2 py-0.5 bg-primary/10 text-primary rounded text-xs font-mono">
+          {permission.name}
         </span>
       ))}
     </div>

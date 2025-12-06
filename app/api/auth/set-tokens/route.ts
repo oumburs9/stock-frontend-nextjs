@@ -6,15 +6,16 @@ import { cookies } from "next/headers"
 export async function POST(request: Request) {
   try {
     const { accessToken, refreshToken } = await request.json()
-
     const cookieStore = await cookies()
+
+    const isProd = process.env.NODE_ENV === "production"
 
     if (accessToken) {
       cookieStore.set("access_token", accessToken, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
+        secure: isProd,
         sameSite: "lax",
-        maxAge: 60 * 15, // 15 minutes
+        maxAge: 60 * 15, // 15 min
         path: "/",
       })
     }
@@ -22,7 +23,7 @@ export async function POST(request: Request) {
     if (refreshToken) {
       cookieStore.set("refresh_token", refreshToken, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
+        secure: isProd,
         sameSite: "lax",
         maxAge: 60 * 60 * 24 * 7, // 7 days
         path: "/",
@@ -31,7 +32,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error("[v0] Error setting tokens:", error)
+    console.error("Error setting tokens:", error)
     return NextResponse.json({ success: false }, { status: 500 })
   }
 }

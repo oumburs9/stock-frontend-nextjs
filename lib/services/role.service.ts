@@ -1,4 +1,7 @@
 import type { Role, CreateRoleRequest, UpdateRoleRequest, RolePermissions } from "@/lib/types/role"
+import { axiosInstance } from "../api/axios-instance"
+import { API_ENDPOINTS } from "../config/api.config"
+import { Permission } from "../types/permission"
 
 // ============================================================================
 // MOCK DATA
@@ -20,7 +23,7 @@ class RoleService {
   // PRODUCTION API METHODS (commented out - uncomment to use real API)
   // ============================================================================
 
-  /*
+ 
   async getRoles(): Promise<Role[]> {
     const response = await axiosInstance.get<Role[]>(API_ENDPOINTS.roles.list)
     return response.data
@@ -48,8 +51,8 @@ class RoleService {
     await axiosInstance.delete(API_ENDPOINTS.roles.detail(id))
   }
 
-  async getRolePermissions(id: string): Promise<string[]> {
-    const response = await axiosInstance.get<string[]>(
+  async getRolePermissions(id: string): Promise<Permission[]> { 
+    const response = await axiosInstance.get<Permission[]>(
       API_ENDPOINTS.roles.permissions(id)
     )
     return response.data
@@ -62,12 +65,13 @@ class RoleService {
     )
     return response.data
   }
-  */
+
 
   // ============================================================================
   // MOCK METHODS (currently active - comment out when using real API)
   // ============================================================================
 
+  /*
   async getRoles(): Promise<Role[]> {
     await new Promise((resolve) => setTimeout(resolve, 500))
     return MOCK_ROLES
@@ -113,7 +117,7 @@ class RoleService {
     await new Promise((resolve) => setTimeout(resolve, 500))
     MOCK_ROLE_PERMISSIONS[id] = permissionIds
     return { roleId: id, permissions: permissionIds }
-  }
+  }*/
 }
 
 export const roleService = new RoleService()

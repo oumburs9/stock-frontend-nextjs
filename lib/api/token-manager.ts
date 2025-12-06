@@ -7,7 +7,11 @@ class TokenManager {
   private refreshToken: string | null = null
   private refreshPromise: Promise<void> | null = null
 
-  private constructor() {}
+  private constructor() {
+    if (typeof window !== "undefined") {
+      this.loadTokenFromServer()
+    }
+  }
 
   static getInstance(): TokenManager {
     if (!TokenManager.instance) {
@@ -15,6 +19,12 @@ class TokenManager {
     }
     return TokenManager.instance
   }
+
+    async loadTokenFromServer() {
+      const res = await fetch("/api/auth/get-token", { credentials: "include" })
+      const data = await res.json()
+      this.accessToken = data.accessToken || null
+    }
 
   setTokens(accessToken: string, refreshToken?: string): void {
     this.accessToken = accessToken
@@ -26,6 +36,7 @@ class TokenManager {
     if (typeof window !== "undefined") {
       fetch("/api/auth/set-tokens", {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ accessToken, refreshToken }),
       }).catch(() => {
@@ -51,6 +62,7 @@ class TokenManager {
     if (typeof window !== "undefined") {
       fetch("/api/auth/clear-tokens", {
         method: "POST",
+        credentials: "include",
       }).catch(() => {
         // Silent fail
       })

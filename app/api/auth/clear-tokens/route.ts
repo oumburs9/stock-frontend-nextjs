@@ -6,13 +6,27 @@ import { cookies } from "next/headers"
 export async function POST() {
   try {
     const cookieStore = await cookies()
+    const isProd = process.env.NODE_ENV === "production"
 
-    cookieStore.delete("access_token")
-    cookieStore.delete("refresh_token")
+    cookieStore.set("access_token", "", {
+      httpOnly: true,
+      secure: isProd,
+      sameSite: "lax",
+      maxAge: 0,
+      path: "/",
+    })
+
+    cookieStore.set("refresh_token", "", {
+      httpOnly: true,
+      secure: isProd,
+      sameSite: "lax",
+      maxAge: 0,
+      path: "/",
+    })
 
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error("[v0] Error clearing tokens:", error)
+    console.error("Error clearing tokens:", error)
     return NextResponse.json({ success: false }, { status: 500 })
   }
 }

@@ -14,7 +14,8 @@ export interface LoginRequest {
 }
 
 export interface LoginResponse {
-  accessToken: string
+  accessToken: string,
+  refreshToken: string
 }
 
 export interface ChangePasswordRequest {

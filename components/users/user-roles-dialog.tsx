@@ -32,8 +32,8 @@ export function UserRolesDialog({ user, open, onOpenChange }: UserRolesDialogPro
   const updateMutation = useUpdateUserRoles()
 
   useEffect(() => {
-    if (user) {
-      setSelectedRoles(user.roles)
+   if (user && user.roles) {
+      setSelectedRoles(user.roles.map(r => r.id))
     } else {
       setSelectedRoles([])
     }
@@ -46,8 +46,8 @@ export function UserRolesDialog({ user, open, onOpenChange }: UserRolesDialogPro
       role.description?.toLowerCase().includes(searchQuery.toLowerCase()),
   )
 
-  const handleToggle = (roleName: string) => {
-    setSelectedRoles((prev) => (prev.includes(roleName) ? prev.filter((r) => r !== roleName) : [...prev, roleName]))
+  const handleToggle = (roleId: string) => {
+    setSelectedRoles((prev) => (prev.includes(roleId) ? prev.filter((r) => r !== roleId) : [...prev, roleId]))
   }
 
   const handleSubmit = () => {
@@ -76,7 +76,7 @@ export function UserRolesDialog({ user, open, onOpenChange }: UserRolesDialogPro
             <span className="font-semibold">
               {user?.firstName} {user?.lastName}
             </span>
-          </DialogDescription>
+          </DialogDescription>user
         </DialogHeader>
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -95,8 +95,8 @@ export function UserRolesDialog({ user, open, onOpenChange }: UserRolesDialogPro
               <div key={role.id} className="flex items-start space-x-3 p-2 rounded-md hover:bg-muted">
                 <Checkbox
                   id={role.id}
-                  checked={selectedRoles.includes(role.name)}
-                  onCheckedChange={() => handleToggle(role.name)}
+                  checked={selectedRoles.includes(role.id)}
+                  onCheckedChange={() => handleToggle(role.id)}
                 />
                 <div className="flex-1">
                   <Label htmlFor={role.id} className="font-mono text-sm cursor-pointer">

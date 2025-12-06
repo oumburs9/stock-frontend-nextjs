@@ -1,41 +1,43 @@
 import type { User, CreateUserRequest, UpdateUserRequest } from "@/lib/types/user"
+import { axiosInstance } from "../api/axios-instance"
+import { API_ENDPOINTS } from "../config/api.config"
 
 // ============================================================================
 // MOCK DATA
 // ============================================================================
-let MOCK_USERS: User[] = [
-  {
-    id: "1",
-    firstName: "John",
-    lastName: "Doe",
-    email: "john@example.com",
-    isActive: true,
-    roles: ["admin"],
-  },
-  {
-    id: "2",
-    firstName: "Jane",
-    lastName: "Smith",
-    email: "jane@example.com",
-    isActive: true,
-    roles: ["manager"],
-  },
-  {
-    id: "3",
-    firstName: "Bob",
-    lastName: "Johnson",
-    email: "bob@example.com",
-    isActive: false,
-    roles: ["user"],
-  },
-]
+// let MOCK_USERS: User[] = [
+//   {
+//     id: "1",
+//     firstName: "John",
+//     lastName: "Doe",
+//     email: "john@example.com",
+//     isActive: true,
+//     roles: ["admin"],
+//   },
+//   {
+//     id: "2",
+//     firstName: "Jane",
+//     lastName: "Smith",
+//     email: "jane@example.com",
+//     isActive: true,
+//     roles: ["manager"],
+//   },
+//   {
+//     id: "3",
+//     firstName: "Bob",
+//     lastName: "Johnson",
+//     email: "bob@example.com",
+//     isActive: false,
+//     roles: ["user"],
+//   },
+// ]
 
 class UserService {
   // ============================================================================
   // PRODUCTION API METHODS (commented out - uncomment to use real API)
   // ============================================================================
 
-  /*
+  
   async getUsers(): Promise<User[]> {
     const response = await axiosInstance.get<User[]>(API_ENDPOINTS.users.list)
     return response.data
@@ -70,12 +72,13 @@ class UserService {
   async updateUserRoles(id: string, roleIds: string[]): Promise<void> {
     await axiosInstance.put(API_ENDPOINTS.users.roles(id), { roleIds })
   }
-  */
+ 
 
   // ============================================================================
   // MOCK METHODS (currently active - comment out when using real API)
   // ============================================================================
-
+ 
+  /*
   async getUsers(): Promise<User[]> {
     await new Promise((resolve) => setTimeout(resolve, 500))
     return MOCK_USERS
@@ -128,6 +131,8 @@ class UserService {
       user.roles = roleIds
     }
   }
+  */
+
 }
 
 export const userService = new UserService()

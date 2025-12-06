@@ -1,10 +1,16 @@
+export interface UserRole {
+  id: string
+  name: string
+  description?: string
+}
+
 export interface User {
   id: string
   firstName: string
   lastName: string
   email: string
   isActive: boolean
-  roles: string[]
+  roles: UserRole[]   // ← ARRAY OF ROLE OBJECTS
 }
 
 export interface CreateUserRequest {
@@ -12,7 +18,7 @@ export interface CreateUserRequest {
   lastName: string
   email: string
   password: string
-  roleIds: string[]
+  // roleIds: string[]
 }
 
 export interface UpdateUserRequest {

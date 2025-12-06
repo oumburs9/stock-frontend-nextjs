@@ -1,5 +1,7 @@
 import { tokenManager } from "@/lib/api/token-manager"
 import type { LoginRequest, LoginResponse, User, ChangePasswordRequest } from "@/lib/types/auth"
+import { axiosInstance } from "../api/axios-instance"
+import { API_ENDPOINTS } from "../config/api.config"
 
 // ============================================================================
 // MOCK DATA - Used for development/testing
@@ -35,7 +37,7 @@ class AuthService {
   // PRODUCTION API METHODS (commented out - uncomment to use real API)
   // ============================================================================
 
-  /*
+  
   async login(credentials: LoginRequest): Promise<LoginResponse> {
     const response = await axiosInstance.post<LoginResponse>(
       API_ENDPOINTS.auth.login,
@@ -99,12 +101,12 @@ class AuthService {
   async changePassword(data: ChangePasswordRequest): Promise<void> {
     await axiosInstance.post(API_ENDPOINTS.auth.changePassword, data)
   }
-  */
+  
 
   // ============================================================================
   // MOCK METHODS (currently active - comment out when using real API)
   // ============================================================================
-
+  /*
   async login(credentials: LoginRequest): Promise<LoginResponse> {
     await new Promise((resolve) => setTimeout(resolve, 800))
 
@@ -156,7 +158,7 @@ class AuthService {
       throw new Error("Current password is incorrect")
     }
   }
-
+  */
   // ============================================================================
   // COMMON METHODS (work for both mock and production)
   // ============================================================================

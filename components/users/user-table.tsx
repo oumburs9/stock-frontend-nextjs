@@ -14,6 +14,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { ConfirmDeleteDialog } from "@/components/shared/confirm-delete-dialog"
 import { UserFormDialog } from "./user-form-dialog"
 import { UserRolesDialog } from "./user-roles-dialog"
 import type { User } from "@/lib/types/user"
@@ -23,6 +24,7 @@ export function UserTable() {
   const [selectedUser, setSelectedUser] = useState<User | null>(null)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [isRolesDialogOpen, setIsRolesDialogOpen] = useState(false)
+  const [userToDelete, setUserToDelete] = useState<User | null>(null)
 
   const { data: users, isLoading } = useUsers()
   const deleteMutation = useDeleteUser()
@@ -45,10 +47,13 @@ export function UserTable() {
     setIsRolesDialogOpen(true)
   }
 
-  const handleDelete = (id: string) => {
-    if (confirm("Are you sure you want to delete this user?")) {
-      deleteMutation.mutate(id)
-    }
+  const handleDelete = (user: User) => {
+    setUserToDelete(user)
+  }
+  const confirmDelete = () => {
+      if (userToDelete) {
+        deleteMutation.mutate(userToDelete.id)
+      }
   }
 
   const handleToggleStatus = (id: string, currentStatus: boolean) => {
@@ -112,8 +117,8 @@ export function UserTable() {
                   <TableCell>
                     <div className="flex flex-wrap gap-1">
                       {user.roles.map((role) => (
-                        <span key={role} className="px-2 py-1 bg-muted rounded text-xs">
-                          {role}
+                        <span key={role.id} className="px-2 py-1 bg-muted rounded text-xs">
+                          {role.name}
                         </span>
                       ))}
                     </div>
@@ -150,7 +155,7 @@ export function UserTable() {
                           {user.isActive ? "Deactivate" : "Activate"}
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={() => handleDelete(user.id)} className="text-destructive">
+                        <DropdownMenuItem onClick={() => handleDelete(user)} className="text-destructive">
                           Delete
                         </DropdownMenuItem>
                       </DropdownMenuContent>
@@ -165,6 +170,16 @@ export function UserTable() {
 
       <UserFormDialog user={selectedUser} open={isDialogOpen} onOpenChange={setIsDialogOpen} />
       <UserRolesDialog user={selectedUser} open={isRolesDialogOpen} onOpenChange={setIsRolesDialogOpen} />
+      <ConfirmDeleteDialog
+        open={!!userToDelete}
+        onOpenChange={(open) => !open && setUserToDelete(null)}
+        onConfirm={confirmDelete}
+        title="Delete User"
+        description="Are you sure you want to delete this user? This will permanently remove the user and all associated data."
+        itemName={
+          userToDelete ? `${userToDelete.firstName} ${userToDelete.lastName} (${userToDelete.email})` : undefined
+        }
+      />
     </div>
   )
 }
