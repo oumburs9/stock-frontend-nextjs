@@ -12,7 +12,7 @@ const _geistMono = Geist_Mono({ subsets: ["latin"] })
 export const metadata: Metadata = {
   title: "ERP System",
   description: "Enterprise Resource Planning System",
-  generator: "v0.app",
+  generator: "stock.app",
   icons: {
     icon: [
       {

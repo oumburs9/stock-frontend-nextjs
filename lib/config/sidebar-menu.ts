@@ -1,4 +1,4 @@
-import { Home, Shield, Users, KeyRound, Package, ShoppingCart } from "lucide-react"
+import { Home, Shield, Users, KeyRound, Package, ShoppingCart, Boxes } from "lucide-react"
 
 export interface MenuItem {
   label: string
@@ -57,6 +57,36 @@ export const sidebarMenu: MenuItem[] = [
     //   { label: "Products", icon: Package, path: "/master-data/products", permission: "product:view" },
     // ],
   },
+  {
+    label: "Inventory",
+    icon: Boxes,
+    collapsible: true,
+    permission: null,
+    children: [
+      { label: "Warehouses", icon: Boxes, path: "/inventory/warehouses", permission: null },
+      { label: "Shops", icon: Package, path: "/inventory/shops", permission: null },
+      { label: "Stock Snapshot", icon: Boxes, path: "/inventory/stock", permission: null },
+      { label: "Transfers", icon: ShoppingCart, path: "/inventory/transfers", permission: null },
+      { label: "Adjustments", icon: Package, path: "/inventory/adjustments", permission: null },
+      { label: "Reservations", icon: Package, path: "/inventory/reservations", permission: null },
+      { label: "Transactions", icon: Package, path: "/inventory/transactions", permission: null },
+    ],
+  },
+  // {
+  //   label: "Inventory",
+  //   icon: Boxes,
+  //   collapsible: true,
+  //   permission: "inventory:view",
+  //   children: [
+  //     { label: "Warehouses", icon: Boxes, path: "/inventory/warehouses", permission: "warehouse:view" },
+  //     { label: "Shops", icon: Package, path: "/inventory/shops", permission: "shop:view" },
+  //     { label: "Stock Snapshot", icon: Boxes, path: "/inventory/stock", permission: "stock:view" },
+  //     { label: "Transfers", icon: ShoppingCart, path: "/inventory/transfers", permission: "stock.transfer" },
+  //     { label: "Adjustments", icon: Package, path: "/inventory/adjustments", permission: "stock.adjust" },
+  //     { label: "Reservations", icon: Package, path: "/inventory/reservations", permission: "stock.reserve" },
+  //     { label: "Transactions", icon: Package, path: "/inventory/transactions", permission: "stock.transactions" },
+  //   ],
+  // },
   {
     label: "Stock",
     icon: Package,
