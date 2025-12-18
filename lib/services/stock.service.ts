@@ -180,12 +180,12 @@ class StockService {
     const response = await axiosInstance.get<StockAvailable>("/stock/available", {
       params: { productId, warehouseId },
     })
-    console.log("ggg:", response.data)
+    
     return response.data
   }
 
   async createTransfer(data: CreateStockTransferRequest): Promise<StockTransfer> {
-    const response = await axiosInstance.post<StockTransfer>("//stock/transfer", data)
+    const response = await axiosInstance.post<StockTransfer>("/stock/transfer", data)
     return response.data
   }
 

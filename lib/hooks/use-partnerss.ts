@@ -7,15 +7,7 @@ import type { CreatePartnerRequest, UpdatePartnerRequest } from "@/lib/types/mas
 export function usePartners(type?: "supplier" | "customer") {
   return useQuery({
     queryKey: ["partners", type],
-    queryFn: () => {
-      const params: any = { limit: 1000 }
-      if (type === "supplier") {
-        params.is_supplier = true
-      } else if (type === "customer") {
-        params.is_customer = true
-      }
-      return partnerService.getPartners(params)
-    },
+    queryFn: () => partnerService.getPartners(type, { limit: 1000 }),
     select: (data) => data.items,
   })
 }

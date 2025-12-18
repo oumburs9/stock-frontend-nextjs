@@ -82,6 +82,7 @@ class PartnerService {
   async getPartner(id: string): Promise<Partner | null> {
     try {
       const response = await axiosInstance.get<Partner>(`/master-data/partners/${id}`)
+      console.log("response: ", response.data)
       return response.data
     } catch {
       return null

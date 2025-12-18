@@ -1,4 +1,4 @@
-import { Home, Shield, Users, KeyRound, Package, ShoppingCart, Boxes } from "lucide-react"
+import { Home, Shield, Users, KeyRound, Package, ShoppingCart, Boxes, FileText, PackageCheck, Truck } from "lucide-react"
 
 export interface MenuItem {
   label: string
@@ -88,17 +88,27 @@ export const sidebarMenu: MenuItem[] = [
   //   ],
   // },
   {
-    label: "Stock",
-    icon: Package,
-    collapsible: true,
-    permission: "stock:view",
-    children: [],
-  },
-  {
     label: "Purchase",
     icon: ShoppingCart,
     collapsible: true,
-    permission: "purchase:view",
-    children: [],
+    permission: null,
+    children: [
+      { label: "Shipments", icon: Truck, path: "/purchase/shipments", permission: null },
+      { label: "Purchase Orders", icon: FileText, path: "/purchase/orders", permission: null },
+      { label: "Expense Types", icon: Package, path: "/purchase/expense-types", permission: null },
+      { label: "Batches", icon: PackageCheck, path: "/purchase/batches", permission: null },
+    ],
   },
+//  {
+//     label: "Purchase",
+//     icon: ShoppingCart,
+//     collapsible: true,
+//     permission: "purchase:view",
+//     children: [
+//       { label: "Shipments", icon: Truck, path: "/purchase/shipments", permission: "shipment:view" },
+//       { label: "Purchase Orders", icon: FileText, path: "/purchase/orders", permission: "purchase-order:view" },
+//       { label: "Expense Types", icon: Package, path: "/purchase/expense-types", permission: "expense-type:view" },
+//       { label: "Batches", icon: PackageCheck, path: "/purchase/batches", permission: "batch:view" },
+//     ],
+//   },
 ]
