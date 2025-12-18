@@ -196,7 +196,7 @@ export function ProductTable() {
                   <TableCell className="text-muted-foreground">{product?.category.name || "-"}</TableCell>
                   <TableCell>{product.brand?.name|| "-"}</TableCell>
                   <TableCell>{product.unit?.name || "-"}</TableCell>
-                  <TableCell className="text-right font-mono">{ product.base_price ? `$${Number(product.base_price).toFixed(2)}` : "0.00"}</TableCell>
+                  <TableCell className="text-right font-mono">{ product.base_price ? `ETB ${Number(product.base_price).toFixed(2)}` : "0.00"}</TableCell>
                   <TableCell>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>

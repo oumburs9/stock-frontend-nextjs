@@ -181,10 +181,10 @@ export function BatchTable({ globalSearch, productFilter, shipmentFilter, poFilt
                       <TableCell className="text-right font-mono">{batch.quantity_received}</TableCell>
                       <TableCell className="text-right font-mono font-medium">{batch.quantity_remaining}</TableCell>
                       <TableCell className="text-right font-mono">
-                        ${Number.parseFloat(batch.base_unit_cost).toFixed(2)}
+                        ETB {Number.parseFloat(batch.base_unit_cost).toFixed(2)}
                       </TableCell>
                       <TableCell className="text-right font-mono font-medium text-green-600 dark:text-green-400">
-                        ${Number.parseFloat(batch.landed_unit_cost).toFixed(2)}
+                        ETB {Number.parseFloat(batch.landed_unit_cost).toFixed(2)}
                       </TableCell>
                       <TableCell>
                         <DropdownMenu>

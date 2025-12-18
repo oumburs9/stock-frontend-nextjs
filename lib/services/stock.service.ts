@@ -13,156 +13,156 @@ import { axiosInstance } from "@/lib/api/axios-instance"
 // ============================================================================
 // MOCK DATA - Stock snapshots showing quantities at each location
 // ============================================================================
-const MOCK_STOCK: StockSnapshot[] = [
-  {
-    id: "stock-1",
-    product: {
-      id: "1",
-      name: 'MacBook Pro 16"',
-      sku: "MBP-16-001",
-      description: "High-performance laptop for professionals with M3 Pro chip",
-      category_id: "2",
-      brand_id: "1",
-      unit_id: "1",
-      base_price: 2499.99,
-    },
-    warehouse: {
-      id: "3b0af3c9-d927-4b41-8a17-f83b152b1f1e",
-      name: "Addis Central Warehouse",
-      address: "Bole, Addis Ababa",
-      description: "Main distribution hub",
-    },
-    quantity: "80",
-    onHand: 80,
-    reserved: 10,
-    available: 70,
-  },
-  {
-    id: "stock-2",
-    product: {
-      id: "2",
-      name: "iPhone 15 Pro",
-      sku: "IPH-15P-001",
-      description: "Latest flagship smartphone with A17 Pro chip",
-      category_id: "3",
-      brand_id: "1",
-      unit_id: "1",
-      base_price: 999.99,
-    },
-    warehouse: {
-      id: "3b0af3c9-d927-4b41-8a17-f83b152b1f1e",
-      name: "Addis Central Warehouse",
-      address: "Bole, Addis Ababa",
-      description: "Main distribution hub",
-    },
-    quantity: "150",
-    onHand: 150,
-    reserved: 25,
-    available: 125,
-  },
-  {
-    id: "stock-3",
-    product: {
-      id: "1",
-      name: 'MacBook Pro 16"',
-      sku: "MBP-16-001",
-      description: "High-performance laptop for professionals with M3 Pro chip",
-      category_id: "2",
-      brand_id: "1",
-      unit_id: "1",
-      base_price: 2499.99,
-    },
-    shop: {
-      id: "fc845e2f-556e-4a94-b67f-3e3b7ec8c234",
-      name: "Piassa Retail Shop",
-      address: "Piassa, Addis Ababa",
-      description: "High-traffic retail branch",
-    },
-    quantity: "15",
-    onHand: 15,
-    reserved: 3,
-    available: 12,
-  },
-  {
-    id: "stock-4",
-    product: {
-      id: "2",
-      name: "iPhone 15 Pro",
-      sku: "IPH-15P-001",
-      description: "Latest flagship smartphone with A17 Pro chip",
-      category_id: "3",
-      brand_id: "1",
-      unit_id: "1",
-      base_price: 999.99,
-    },
-    shop: {
-      id: "fc845e2f-556e-4a94-b67f-3e3b7ec8c234",
-      name: "Piassa Retail Shop",
-      address: "Piassa, Addis Ababa",
-      description: "High-traffic retail branch",
-    },
-    quantity: "45",
-    onHand: 45,
-    reserved: 8,
-    available: 37,
-  },
-]
+// const MOCK_STOCK: StockSnapshot[] = [
+//   {
+//     id: "stock-1",
+//     product: {
+//       id: "1",
+//       name: 'MacBook Pro 16"',
+//       sku: "MBP-16-001",
+//       description: "High-performance laptop for professionals with M3 Pro chip",
+//       category_id: "2",
+//       brand_id: "1",
+//       unit_id: "1",
+//       base_price: 2499.99,
+//     },
+//     warehouse: {
+//       id: "3b0af3c9-d927-4b41-8a17-f83b152b1f1e",
+//       name: "Addis Central Warehouse",
+//       address: "Bole, Addis Ababa",
+//       description: "Main distribution hub",
+//     },
+//     quantity: "80",
+//     onHand: 80,
+//     reserved: 10,
+//     available: 70,
+//   },
+//   {
+//     id: "stock-2",
+//     product: {
+//       id: "2",
+//       name: "iPhone 15 Pro",
+//       sku: "IPH-15P-001",
+//       description: "Latest flagship smartphone with A17 Pro chip",
+//       category_id: "3",
+//       brand_id: "1",
+//       unit_id: "1",
+//       base_price: 999.99,
+//     },
+//     warehouse: {
+//       id: "3b0af3c9-d927-4b41-8a17-f83b152b1f1e",
+//       name: "Addis Central Warehouse",
+//       address: "Bole, Addis Ababa",
+//       description: "Main distribution hub",
+//     },
+//     quantity: "150",
+//     onHand: 150,
+//     reserved: 25,
+//     available: 125,
+//   },
+//   {
+//     id: "stock-3",
+//     product: {
+//       id: "1",
+//       name: 'MacBook Pro 16"',
+//       sku: "MBP-16-001",
+//       description: "High-performance laptop for professionals with M3 Pro chip",
+//       category_id: "2",
+//       brand_id: "1",
+//       unit_id: "1",
+//       base_price: 2499.99,
+//     },
+//     shop: {
+//       id: "fc845e2f-556e-4a94-b67f-3e3b7ec8c234",
+//       name: "Piassa Retail Shop",
+//       address: "Piassa, Addis Ababa",
+//       description: "High-traffic retail branch",
+//     },
+//     quantity: "15",
+//     onHand: 15,
+//     reserved: 3,
+//     available: 12,
+//   },
+//   {
+//     id: "stock-4",
+//     product: {
+//       id: "2",
+//       name: "iPhone 15 Pro",
+//       sku: "IPH-15P-001",
+//       description: "Latest flagship smartphone with A17 Pro chip",
+//       category_id: "3",
+//       brand_id: "1",
+//       unit_id: "1",
+//       base_price: 999.99,
+//     },
+//     shop: {
+//       id: "fc845e2f-556e-4a94-b67f-3e3b7ec8c234",
+//       name: "Piassa Retail Shop",
+//       address: "Piassa, Addis Ababa",
+//       description: "High-traffic retail branch",
+//     },
+//     quantity: "45",
+//     onHand: 45,
+//     reserved: 8,
+//     available: 37,
+//   },
+// ]
 
-const MOCK_TRANSFERS: StockTransfer[] = [
-  {
-    id: "transfer-1",
-    product: { id: "1", name: 'MacBook Pro 16"' },
-    fromWarehouse: {
-      id: "3b0af3c9-d927-4b41-8a17-f83b152b1f1e",
-      name: "Addis Central Warehouse",
-      address: "Bole, Addis Ababa",
-    },
-    toShop: {
-      id: "fc845e2f-556e-4a94-b67f-3e3b7ec8c234",
-      name: "Piassa Retail Shop",
-      address: "Piassa, Addis Ababa",
-    },
-    quantity: "5",
-    direction: "transfer",
-    reason: "replenish_retail_stock",
-    createdAt: "2025-12-10T06:15:45.182Z",
-  },
-]
+// const MOCK_TRANSFERS: StockTransfer[] = [
+//   {
+//     id: "transfer-1",
+//     product: { id: "1", name: 'MacBook Pro 16"' },
+//     fromWarehouse: {
+//       id: "3b0af3c9-d927-4b41-8a17-f83b152b1f1e",
+//       name: "Addis Central Warehouse",
+//       address: "Bole, Addis Ababa",
+//     },
+//     toShop: {
+//       id: "fc845e2f-556e-4a94-b67f-3e3b7ec8c234",
+//       name: "Piassa Retail Shop",
+//       address: "Piassa, Addis Ababa",
+//     },
+//     quantity: "5",
+//     direction: "transfer",
+//     reason: "replenish_retail_stock",
+//     createdAt: "2025-12-10T06:15:45.182Z",
+//   },
+// ]
 
-const MOCK_ADJUSTMENTS: StockAdjustment[] = [
-  {
-    id: "adj-1",
-    product: { id: "1", name: 'MacBook Pro 16"' },
-    toWarehouse: {
-      id: "3b0af3c9-d927-4b41-8a17-f83b152b1f1e",
-      name: "Addis Central Warehouse",
-      address: "Bole, Addis Ababa",
-    },
-    quantity: "25",
-    direction: "in",
-    reason: "year_end_reconciliation",
-    beforeQuantity: 55,
-    afterQuantity: 80,
-    createdAt: "2025-12-10T06:18:12.334Z",
-  },
-]
+// const MOCK_ADJUSTMENTS: StockAdjustment[] = [
+//   {
+//     id: "adj-1",
+//     product: { id: "1", name: 'MacBook Pro 16"' },
+//     toWarehouse: {
+//       id: "3b0af3c9-d927-4b41-8a17-f83b152b1f1e",
+//       name: "Addis Central Warehouse",
+//       address: "Bole, Addis Ababa",
+//     },
+//     quantity: "25",
+//     direction: "in",
+//     reason: "year_end_reconciliation",
+//     beforeQuantity: 55,
+//     afterQuantity: 80,
+//     createdAt: "2025-12-10T06:18:12.334Z",
+//   },
+// ]
 
-const MOCK_RESERVATIONS: StockReservation[] = [
-  {
-    id: "res-1",
-    product: { id: "1", name: 'MacBook Pro 16"' },
-    warehouse: {
-      id: "3b0af3c9-d927-4b41-8a17-f83b152b1f1e",
-      name: "Addis Central Warehouse",
-      address: "Bole, Addis Ababa",
-    },
-    salesOrderId: "95a1894b-4c66-461b-b988-71988db7b1c8",
-    quantity: "10",
-    status: "active",
-    createdAt: "2025-12-10T06:20:43.538Z",
-    updatedAt: "2025-12-10T06:20:43.538Z",
-  },
-]
+// const MOCK_RESERVATIONS: StockReservation[] = [
+//   {
+//     id: "res-1",
+//     product: { id: "1", name: 'MacBook Pro 16"' },
+//     warehouse: {
+//       id: "3b0af3c9-d927-4b41-8a17-f83b152b1f1e",
+//       name: "Addis Central Warehouse",
+//       address: "Bole, Addis Ababa",
+//     },
+//     salesOrderId: "95a1894b-4c66-461b-b988-71988db7b1c8",
+//     quantity: "10",
+//     status: "active",
+//     createdAt: "2025-12-10T06:20:43.538Z",
+//     updatedAt: "2025-12-10T06:20:43.538Z",
+//   },
+// ]
 
 class StockService {
   // ============================================================================

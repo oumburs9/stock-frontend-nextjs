@@ -90,7 +90,7 @@ export function AdjustBatchExpenseDialog({
             <div className="p-3 border rounded-md bg-muted/50">
               <div className="flex justify-between items-center">
                 <span className="text-sm font-medium capitalize">{expense.type}</span>
-                <span className="text-sm font-mono">${Number.parseFloat(expense.amount).toFixed(2)}</span>
+                <span className="text-sm font-mono">ETB {Number.parseFloat(expense.amount).toFixed(2)}</span>
               </div>
               {expense.description && <p className="text-sm text-muted-foreground mt-1">{expense.description}</p>}
             </div>
