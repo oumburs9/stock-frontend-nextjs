@@ -179,6 +179,7 @@ export function ShipmentFormDialog({ shipment, open, onOpenChange }: ShipmentFor
             exchange_rate: data.exchange_rate  || null,
             notes: data.notes  || null,
             // Note: receiving_warehouse_id and receiving_shop_id are set during receiving, not here
+            items: transformedItems,
           },
         })
         toast({

@@ -180,6 +180,11 @@ export interface UpdateShipmentRequest {
   receiving_shop_id?: string
   exchange_rate?: string
   notes?: string
+  items: {
+    purchase_order_item_id?: string // Optional - links to PO item
+    product_id: string // Always required
+    quantity_expected: string
+  }[]
 }
 
 export interface AddShipmentExpenseRequest {
