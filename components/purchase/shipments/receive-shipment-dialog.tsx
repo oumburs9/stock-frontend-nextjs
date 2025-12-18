@@ -114,7 +114,7 @@ export function ReceiveShipmentDialog({ shipment, selectedItemId, open, onOpenCh
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {postings.postings.map((posting: any, index: number) => (
+                  {postings?.postings?.map((posting: any, index: number) => (
                     <TableRow key={index}>
                       <TableCell className="font-mono text-xs">{ getProductName(posting.product_id) }</TableCell>
                       <TableCell>{posting.allocation.quantity}</TableCell>
