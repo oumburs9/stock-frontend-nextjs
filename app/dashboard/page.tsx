@@ -6,6 +6,7 @@ import { useAuth } from "@/lib/hooks/use-auth"
 
 export default function DashboardPage() {
   const { user } = useAuth()
+  console.log("user: ", user)
 
   return (
     <DashboardLayout>

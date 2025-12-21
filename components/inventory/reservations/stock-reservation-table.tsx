@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/dialog"
 import { Card, CardContent } from "@/components/ui/card"
 import type { StockReservation } from "@/lib/types/inventory"
+import { useSalesOrders } from "@/lib/hooks/use-sales"
 
 export function StockReservationTable() {
   const [search, setSearch] = useState("")
@@ -34,6 +35,8 @@ export function StockReservationTable() {
   const [selectedReservation, setSelectedReservation] = useState<StockReservation | null>(null)
 
   const { data: reservations, isLoading } = useStockReservations()
+  const {data: salesOrders} = useSalesOrders()
+  // console.log('salesOrders: ',salesOrders)
   const releaseMutation = useReleaseReservation()
   const consumeMutation = useConsumeReservation()
 

@@ -1,4 +1,4 @@
-import { Home, Shield, Users, KeyRound, Package, ShoppingCart, Boxes, FileText, PackageCheck, Truck } from "lucide-react"
+import { Home, Shield, Users, KeyRound, Package, ShoppingCart, Boxes, FileText, PackageCheck, Truck, Receipt, DollarSign, Calculator, Landmark, CreditCard, FileMinus, Banknote, BarChart3, Percent, TrendingUp } from "lucide-react"
 
 export interface MenuItem {
   label: string
@@ -45,6 +45,7 @@ export const sidebarMenu: MenuItem[] = [
       { label: "Attributes", icon: Package, path: "/master-data/attributes", permission: null },
       { label: "Attribute Sets", icon: Package, path: "/master-data/attribute-sets", permission: null },
       { label: "Products", icon: Package, path: "/master-data/products", permission: null },
+      {label: "Payment Sources", icon: CreditCard, path: "/master-data/payment-sources", permission: null },
     ],
     // permission: "master-data:view",
     // children: [
@@ -55,6 +56,7 @@ export const sidebarMenu: MenuItem[] = [
     //   { label: "Attributes", icon: Package, path: "/master-data/attributes", permission: "attribute:view" },
     //   { label: "Attribute Sets", icon: Package, path: "/master-data/attribute-sets", permission: "attribute-set:view" },
     //   { label: "Products", icon: Package, path: "/master-data/products", permission: "product:view" },
+    //   { label: "Payment Sources", icon: CreditCard, path: "/master-data/payment-sources", permission: "payment-source:view" },
     // ],
   },
   {
@@ -111,4 +113,53 @@ export const sidebarMenu: MenuItem[] = [
 //       { label: "Batches", icon: PackageCheck, path: "/purchase/batches", permission: "batch:view" },
 //     ],
 //   },
+ {
+    label: "Sales",
+    icon: Receipt,
+    collapsible: true,
+    permission: null,
+    children: [
+      { label: "Sales Orders", icon: Receipt, path: "/sales/orders", permission: null },
+      { label: "Pricing Rules", icon: Banknote, path: "/sales/pricing/rules", permission: null },
+      { label: "Price Quote", icon: Calculator, path: "/sales/pricing/quote", permission: null },
+    ],
+  },
+  //  {
+  //   label: "Sales",
+  //   icon: Receipt,
+  //   collapsible: true,
+  //   permission: "sales:view",
+  //   children: [
+  //     { label: "Sales Orders", icon: Receipt, path: "/sales/orders", permission: "sales-order:view" },
+  //     { label: "Pricing Rules", icon: DollarSign, path: "/sales/pricing/rules", permission: "pricing:view" },
+  //     { label: "Price Quote", icon: Calculator, path: "/sales/pricing/quote", permission: "pricing:view" },
+  //   ],
+  // },
+
+   {
+    label: "Finance",
+    icon: Banknote,
+    collapsible: true,
+    permission: null,
+    children: [
+      { label: "Customer Invoices", icon: FileText, path: "/finance/invoices", permission: null },
+      { label: "Accounts Receivable", icon: CreditCard, path: "/finance/receivables", permission: null },
+      { label: "Accounts Payable", icon: DollarSign, path: "/finance/payables", permission: null },
+      { label: "Tax Configuration", icon: Percent, path: "/finance/tax", permission: null  },
+      { label: "Profit & Loss", icon: TrendingUp, path: "/finance/costing", permission: null },
+    ],
+  },
+  // {
+  //   label: "Finance",
+  //   icon: Banknote,
+  //   collapsible: true,
+  //   permission: "finance:view",
+  //   children: [
+  //     { label: "Customer Invoices", icon: FileText, path: "/finance/invoices", permission: "invoice:view" },
+  //     { label: "Accounts Receivable", icon: CreditCard, path: "/finance/receivables", permission: "receivable:view" },
+  //     { label: "Accounts Payable", icon: DollarSign, path: "/finance/payables", permission: "payable:view" },
+  //     { label: "Tax Configuration", icon: Percent, path: "/finance/tax", permission: "tax:view" },
+  //     { label: "Profit & Loss", icon: TrendingUp, path: "/finance/costing", permission: "costing:view" },
+  //   ],
+  // },
 ]
