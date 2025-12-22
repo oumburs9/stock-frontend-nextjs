@@ -18,6 +18,7 @@ import { ConfirmDeleteDialog } from "@/components/shared/confirm-delete-dialog"
 import { UserFormDialog } from "./user-form-dialog"
 import { UserRolesDialog } from "./user-roles-dialog"
 import type { User } from "@/lib/types/user"
+import { useAuth } from "@/lib/hooks/use-auth"
 
 export function UserTable() {
   const [search, setSearch] = useState("")
@@ -26,6 +27,7 @@ export function UserTable() {
   const [isRolesDialogOpen, setIsRolesDialogOpen] = useState(false)
   const [userToDelete, setUserToDelete] = useState<User | null>(null)
 
+  const { hasPermission } = useAuth()
   const { data: users, isLoading } = useUsers()
   const deleteMutation = useDeleteUser()
   const updateStatusMutation = useUpdateUserStatus()
@@ -72,7 +74,7 @@ export function UserTable() {
             className="pl-9"
           />
         </div>
-        <Button
+       { hasPermission("user:create") && ( <Button
           onClick={() => {
             setSelectedUser(null)
             setIsDialogOpen(true)
@@ -80,7 +82,7 @@ export function UserTable() {
         >
           <Plus className="h-4 w-4 mr-2" />
           Add User
-        </Button>
+        </Button> )}
       </div>
 
       <div className="rounded-md border">
@@ -146,18 +148,18 @@ export function UserTable() {
                       <DropdownMenuContent align="end">
                         <DropdownMenuLabel>Actions</DropdownMenuLabel>
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={() => handleEdit(user)}>Edit</DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleManageRoles(user)}>
+                        {hasPermission("user:update") && (<DropdownMenuItem onClick={() => handleEdit(user)}>Edit</DropdownMenuItem>) }
+                        {hasPermission("user:assign-role") && (<DropdownMenuItem onClick={() => handleManageRoles(user)}>
                           <UserCog className="h-4 w-4 mr-2" />
                           Manage Roles
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleToggleStatus(user.id, user.isActive)}>
+                        </DropdownMenuItem>)}
+                        {hasPermission("user:update-status") && ( <DropdownMenuItem onClick={() => handleToggleStatus(user.id, user.isActive)}>
                           {user.isActive ? "Deactivate" : "Activate"}
-                        </DropdownMenuItem>
+                        </DropdownMenuItem>) }
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={() => handleDelete(user)} className="text-destructive">
+                       {hasPermission("user:delete") && ( <DropdownMenuItem onClick={() => handleDelete(user)} className="text-destructive">
                           Delete
-                        </DropdownMenuItem>
+                        </DropdownMenuItem>)}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>
