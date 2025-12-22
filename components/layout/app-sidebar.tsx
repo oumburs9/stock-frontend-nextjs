@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { memo, useCallback, useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { ChevronDown, ChevronRight, LogOut, UserIcon } from "lucide-react"
@@ -18,66 +18,119 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { ThemeToggle } from "./theme-toggle"
 
-function SidebarMenuItem({ item, level = 0 }: { item: MenuItem; level?: number }) {
-  const [isOpen, setIsOpen] = useState(true)
-  const pathname = usePathname()
-  const { hasPermission } = useAuth()
+const SIDEBAR_MENU_STATE_KEY = "sidebar-menu-state"
 
-  // Check permission
-  if (item.permission && !hasPermission(item.permission)) {
-    return null
+function getInitialMenuState(): Record<string, boolean> {
+  if (typeof window === "undefined") return {}
+  try {
+    const saved = localStorage.getItem(SIDEBAR_MENU_STATE_KEY)
+    return saved ? JSON.parse(saved) : {}
+  } catch {
+    return {}
   }
+}
 
-  const isActive = item.path && pathname === item.path
-  const hasChildren = item.children && item.children.length > 0
+function saveMenuState(state: Record<string, boolean>) {
+  if (typeof window === "undefined") return
+  try {
+    localStorage.setItem(SIDEBAR_MENU_STATE_KEY, JSON.stringify(state))
+  } catch {
+    // Ignore errors
+  }
+}
 
-  if (item.collapsible && hasChildren) {
-    return (
-      <div className="space-y-1">
-        <button
-          onClick={() => setIsOpen(!isOpen)}
+const SidebarMenuItem = memo(
+  ({
+    item,
+    level = 0,
+    isOpen,
+    onToggle,
+  }: {
+    item: MenuItem
+    level?: number
+    isOpen: boolean
+    onToggle: () => void
+  }) => {
+    const pathname = usePathname()
+    const { hasPermission } = useAuth()
+
+    // Check permission
+    if (item.permission && !hasPermission(item.permission)) {
+      return null
+    }
+
+    const isActive = item.path && pathname === item.path
+    const hasChildren = item.children && item.children.length > 0
+
+    if (item.collapsible && hasChildren) {
+      return (
+        <div className="space-y-1">
+          <button
+            onClick={onToggle}
+            className={cn(
+              "w-full flex items-center gap-3 px-3 py-2 text-sm rounded-md transition-colors",
+              "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+              "text-sidebar-foreground/70",
+            )}
+            style={{ paddingLeft: `${0.75 + level * 1}rem` }}
+          >
+            <item.icon className="h-4 w-4 shrink-0" />
+            <span className="flex-1 text-left font-medium">{item.label}</span>
+            {isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+          </button>
+          {isOpen && (
+            <div className="space-y-1">
+              {item.children?.map((child, i) => (
+                <SidebarMenuItemWrapper key={child.path || i} item={child} level={level + 1} />
+              ))}
+            </div>
+          )}
+        </div>
+      )
+    }
+
+    if (item.path) {
+      return (
+        <Link
+          href={item.path}
           className={cn(
-            "w-full flex items-center gap-3 px-3 py-2 text-sm rounded-md transition-colors",
-            "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-            "text-sidebar-foreground/70",
+            "flex items-center gap-3 px-3 py-2 text-sm rounded-md transition-colors",
+            isActive
+              ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+              : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
           )}
           style={{ paddingLeft: `${0.75 + level * 1}rem` }}
         >
           <item.icon className="h-4 w-4 shrink-0" />
-          <span className="flex-1 text-left font-medium">{item.label}</span>
-          {isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-        </button>
-        {isOpen && (
-          <div className="space-y-1">
-            {item.children?.map((child, i) => (
-              <SidebarMenuItem key={i} item={child} level={level + 1} />
-            ))}
-          </div>
-        )}
-      </div>
-    )
-  }
+          <span>{item.label}</span>
+        </Link>
+      )
+    }
 
-  if (item.path) {
-    return (
-      <Link
-        href={item.path}
-        className={cn(
-          "flex items-center gap-3 px-3 py-2 text-sm rounded-md transition-colors",
-          isActive
-            ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
-            : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-        )}
-        style={{ paddingLeft: `${0.75 + level * 1}rem` }}
-      >
-        <item.icon className="h-4 w-4 shrink-0" />
-        <span>{item.label}</span>
-      </Link>
-    )
-  }
+    return null
+  },
+)
 
-  return null
-}
+SidebarMenuItem.displayName = "SidebarMenuItem"
+
+const SidebarMenuItemWrapper = memo(({ item, level = 0 }: { item: MenuItem; level?: number }) => {
+  const [menuState, setMenuState] = useState<Record<string, boolean>>(getInitialMenuState)
+
+  const itemKey = item.path || item.label.toLowerCase().replace(/\s+/g, "-")
+  const isOpen = menuState[itemKey] ?? false
+
+  const handleToggle = useCallback(() => {
+    setMenuState((prev) => {
+      const newState = { ...prev, [itemKey]: !prev[itemKey] }
+      saveMenuState(newState)
+      return newState
+    })
+  }, [itemKey])
+
+  return <SidebarMenuItem item={item} level={level} isOpen={isOpen} onToggle={handleToggle} />
+})
+
+SidebarMenuItemWrapper.displayName = "SidebarMenuItemWrapper"
 
 export function AppSidebar() {
   const { user, logout } = useAuth()
@@ -93,7 +146,7 @@ export function AppSidebar() {
       {/* Navigation */}
       <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
         {sidebarMenu.map((item, i) => (
-          <SidebarMenuItem key={i} item={item} />
+          <SidebarMenuItemWrapper key={item.path || i} item={item} />
         ))}
       </nav>
 

@@ -22,7 +22,7 @@ export const sidebarMenu: MenuItem[] = [
     collapsible: true,
     permission: null,
     children: [
-      { label: "Users", icon: Users, path: "/users", permission: null },
+      { label: "Users", icon: Users, path: "/users", permission: 'read.u' },
       { label: "Roles", icon: KeyRound, path: "/roles", permission: null},
       { label: "Permissions", icon: KeyRound, path: "/permissions", permission: null },
     // permission: "access-control:view",
