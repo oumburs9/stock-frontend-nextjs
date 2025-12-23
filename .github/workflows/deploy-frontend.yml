@@ -35,9 +35,6 @@ jobs:
           rm -rf deploy
           mkdir -p deploy
           cp -R .next/standalone/* deploy/
-          rm -f deploy/package.json
-          rm -f deploy/pnpm-lock.yaml
-          rm -f deploy/package-lock.json
           mkdir -p deploy/.next
           cp -R .next/static deploy/.next/static
           if [ -d public ]; then cp -R public deploy/public; fi
