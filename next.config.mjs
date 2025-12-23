@@ -1,4 +1,4 @@
-/** @type {import('next').NextConfig} */
+/** @type {import("next").NextConfig} */
 const nextConfig = {
   typescript: {
     ignoreBuildErrors: true,
@@ -6,6 +6,16 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
+  output: "standalone",
+
+  // async rewrites() {
+  //   return [
+  //     {
+  //       source: "/backend/:path*",
+  //       destination: "https://api.alifcarimport.com/:path*",
+  //     },
+  //   ];
+  // },
  
 }
 
