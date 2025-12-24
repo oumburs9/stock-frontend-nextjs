@@ -1,4 +1,5 @@
 export interface User {
+  avatar?: string | Blob | undefined
   id: string
   email: string
   firstName: string

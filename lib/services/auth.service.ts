@@ -165,6 +165,7 @@ class AuthService {
 
   hasPermission(permission: string, user: User | null): boolean {
     if (!user) return false
+    if (!permission) return true // public access
     return user.permissions.includes("*") || user.permissions.includes(permission)
   }
 
