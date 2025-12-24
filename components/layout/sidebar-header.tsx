@@ -14,7 +14,7 @@ export function AppSidebarHeader() {
                 <Building2 className="size-4" />
               </div>
               <div className="grid flex-1 text-left text-sm leading-tight">
-                <span className="truncate font-semibold">Acme Corp</span>
+                <span className="truncate font-semibold">ERP System</span>
                 <span className="truncate text-xs text-muted-foreground">Enterprise Plan</span>
               </div>
               <ThemeToggle/>
