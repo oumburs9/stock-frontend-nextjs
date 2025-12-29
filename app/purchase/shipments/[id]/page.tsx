@@ -29,69 +29,7 @@ import { usePartners } from "@/lib/hooks/use-partners"
 import { useProducts } from "@/lib/hooks/use-products"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 
-const DUMMY_DATA = {
-  shipment: {
-    id: "d1111111-2222-3333-4444-555555555555",
-    code: "BL-001",
-    type: "import",
-    status: "partially_received",
-    supplier_id: "a1b2c3d4-e5f6-7890-1234-abcdefabcdef",
-    receiving_warehouse_id: null,
-    receiving_shop_id: null,
-    departure_date: "2024-01-10",
-    arrival_date: "2024-01-25",
-    currency: "USD",
-    exchange_rate: "1.0",
-    created_at: "2024-01-05T08:30:00Z",
-    updated_at: "2024-01-25T10:00:00Z",
-    items: [
-      {
-        id: "item-1",
-        shipment_id: "d1111111-2222-3333-4444-555555555555",
-        purchase_order_item_id: null,
-        product_id: "1771c2cb-a39d-4d39-b939-b87bd2e35852",
-        quantity_expected: "100.00",
-        quantity_received: "60.00",
-      },
-      {
-        id: "item-2",
-        shipment_id: "d1111111-2222-3333-4444-555555555555",
-        purchase_order_item_id: null,
-        product_id: "2771c2cb-a39d-4d39-b939-b87bd2e35853",
-        quantity_expected: "50.00",
-        quantity_received: "0.00",
-      },
-    ],
-    expenses: [
-      {
-        id: "expense-1",
-        shipment_id: "d1111111-2222-3333-4444-555555555555",
-        expense_type_id: null,
-        type: "freight",
-        amount: "500.00",
-        currency: "USD",
-        description: "Ocean freight charges",
-        expense_date: "2024-01-15",
-        adjustments: [
-          {
-            id: "adj-1",
-            expense_id: "expense-1",
-            amount: "50.00",
-            adjustment_date: "2024-01-20",
-            reason: "Overestimated cost",
-            created_at: "2024-01-20T10:00:00Z",
-            created_by: "admin",
-          },
-        ],
-      },
-    ],
-  },
-  suppliers: [{ id: "a1b2c3d4-e5f6-7890-1234-abcdefabcdef", name: "Global Imports Ltd.", type: "supplier" }],
-  products: [
-    { id: "1771c2cb-a39d-4d39-b939-b87bd2e35852", name: "Premium Widget A", sku: "WIDGET-A-001" },
-    { id: "2771c2cb-a39d-4d39-b939-b87bd2e35853", name: "Deluxe Gadget B", sku: "GADGET-B-002" },
-  ],
-}
+
 
 export default function ShipmentDetailPage() {
   const { id } = useParams<{ id: string }>()

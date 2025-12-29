@@ -18,6 +18,8 @@ import { ConfirmDeleteDialog } from "@/components/shared/confirm-delete-dialog"
 import { RoleFormDialog } from "./role-form-dialog"
 import { RolePermissionsDialog } from "./role-permissions-dialog"
 import type { Role } from "@/lib/types/role"
+import { useRolePermissions } from "@/lib/hooks/use-roles"
+import { useAuth } from "@/lib/hooks/use-auth"
 
 export function RoleTable() {
   const [search, setSearch] = useState("")
@@ -26,6 +28,7 @@ export function RoleTable() {
   const [isPermissionsDialogOpen, setIsPermissionsDialogOpen] = useState(false)
   const [roleToDelete, setRoleToDelete] = useState<Role | null>(null)
 
+  const { hasPermission } = useAuth()
   const { data: roles, isLoading } = useRoles()
   const deleteMutation = useDeleteRole()
 
@@ -72,7 +75,7 @@ export function RoleTable() {
             className="pl-9"
           />
         </div>
-        <Button
+        { hasPermission('role:create') && (<Button
           onClick={() => {
             setSelectedRole(null)
             setIsFormDialogOpen(true)
@@ -80,7 +83,7 @@ export function RoleTable() {
         >
           <Plus className="h-4 w-4 mr-2" />
           Add Role
-        </Button>
+        </Button>)}
       </div>
 
       <div className="rounded-md border">
@@ -124,15 +127,15 @@ export function RoleTable() {
                       <DropdownMenuContent align="end">
                         <DropdownMenuLabel>Actions</DropdownMenuLabel>
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={() => handleEdit(role)}>Edit</DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleManagePermissions(role)}>
+                        {hasPermission("role:update") && (<DropdownMenuItem onClick={() => handleEdit(role)}>Edit</DropdownMenuItem>)}
+                        {hasPermission("role:assign-permission") && (<DropdownMenuItem onClick={() => handleManagePermissions(role)}>
                           <Shield className="h-4 w-4 mr-2" />
                           Manage Permissions
-                        </DropdownMenuItem>
+                        </DropdownMenuItem>)}
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={() => handleDelete(role)} className="text-destructive">
+                        {hasPermission("role:delete") && (<DropdownMenuItem onClick={() => handleDelete(role)} className="text-destructive">
                           Delete
-                        </DropdownMenuItem>
+                        </DropdownMenuItem>)}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>
@@ -184,4 +187,5 @@ function RolePermissionsList({ roleId }: { roleId: string }) {
   )
 }
 
-import { useRolePermissions } from "@/lib/hooks/use-roles"
+
+

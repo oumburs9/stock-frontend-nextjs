@@ -31,7 +31,7 @@ export function EditSalesOrderItemDialog({ salesOrderId, item, open, onOpenChang
     formState: { errors },
   } = useForm<UpdateSalesOrderItemRequest>({
     defaultValues: {
-      quantity: item.quantity,
+      // quantity: item.quantity,
       unitPrice: item.unit_price,
       discountAmount: item.discount_amount,
       discountPercent: item.discount_percent,
@@ -44,7 +44,7 @@ export function EditSalesOrderItemDialog({ salesOrderId, item, open, onOpenChang
   useEffect(() => {
     if (item) {
       reset({
-        quantity: item.quantity,
+        // quantity: item.quantity,
         unitPrice: item.unit_price,
         discountAmount: item.discount_amount,
         discountPercent: item.discount_percent,
@@ -97,10 +97,13 @@ export function EditSalesOrderItemDialog({ salesOrderId, item, open, onOpenChang
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="space-y-2">
             <Label>Original List Price</Label>
+              <p className="text-sm text-muted-foreground">
+                Quantity cannot be changed after an item is added. Remove and re-add the item to change quantity.
+              </p>
             <div className="text-2xl font-bold">{formatCurrency(Number.parseFloat(item.list_price))}</div>
           </div>
 
-          <div className="space-y-2">
+          {/* <div className="space-y-2">
             <Label htmlFor="quantity">Quantity</Label>
             <Input
               id="quantity"
@@ -109,7 +112,7 @@ export function EditSalesOrderItemDialog({ salesOrderId, item, open, onOpenChang
               {...register("quantity", { required: "Quantity is required" })}
             />
             {errors.quantity && <p className="text-sm text-destructive">{errors.quantity.message}</p>}
-          </div>
+          </div> */}
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">

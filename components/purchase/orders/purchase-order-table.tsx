@@ -118,6 +118,7 @@ export function PurchaseOrderTable() {
   const startIndex = (page - 1) * itemsPerPage
   const paginatedOrder = purchaseOrders?.slice(startIndex, startIndex + itemsPerPage)
   const totalPages = Math.ceil((purchaseOrders?.length || 0) / itemsPerPage)
+  console.log("paginated: ", paginatedOrder)
 
   return (
     <div className="space-y-4">

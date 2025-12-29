@@ -33,6 +33,7 @@ export function SearchableSelect({
   return (
     <div className="relative">
       <Button
+        type="button"
         variant="outline"
         role="combobox"
         className={cn("w-full justify-between", !value && "text-muted-foreground")}
@@ -59,6 +60,7 @@ export function SearchableSelect({
             ) : (
               filteredOptions.map((option) => (
                 <button
+                  type="button"
                   key={option.id}
                   onClick={() => {
                     onValueChange(option.id)

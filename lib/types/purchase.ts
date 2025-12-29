@@ -30,6 +30,8 @@ export interface PurchaseOrderItem {
   unit_price: string
   unit_id: string | null
   total_price: string
+  quantity_received: string
+  quantity_remaining: string
 }
 
 export interface PurchaseOrder {

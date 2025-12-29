@@ -105,7 +105,7 @@ export interface AddSalesOrderItemRequest {
 }
 
 export interface UpdateSalesOrderItemRequest {
-  quantity?: string
+  // quantity?: string
   unitPrice?: string
   discountAmount?: string
   discountPercent?: string

@@ -3,7 +3,6 @@
 import { useState } from "react"
 import { useForm, useFieldArray } from "react-hook-form"
 import { useReceivePurchaseOrder } from "@/lib/hooks/use-purchase-orders"
-import { useBatches } from "@/lib/hooks/use-batches"
 import { useWarehouses } from "@/lib/hooks/use-warehouses"
 import { useShops } from "@/lib/hooks/use-shops"
 import { useProducts } from "@/lib/hooks/use-products"
@@ -34,23 +33,8 @@ export function PurchaseOrderReceiveDialog({
   const { data: warehouses } = useWarehouses()
   const { data: shops } = useShops()
   const { data: products } = useProducts()
-  const { data: batches } = useBatches()
   const [showPostings, setShowPostings] = useState(false)
   const [postings, setPostings] = useState<any>(null)
-
-  // Calculate received quantity from batches
-  const getReceivedQuantity = (productId: string) => {
-    if (!batches) return "0"
-    const productBatches = batches.filter((b) => b.product_id === productId && !b.shipment_id)
-    const total = productBatches.reduce((sum, b) => sum + Number.parseFloat(b.quantity_received), 0)
-    return total.toString()
-  }
-
-  const getRemainingQuantity = (productId: string, orderedQty: string) => {
-    const received = Number.parseFloat(getReceivedQuantity(productId))
-    const ordered = Number.parseFloat(orderedQty)
-    return Math.max(0, ordered - received).toString()
-  }
 
   const getProductName = (productId: string) => {
     const product = products?.find((p) => p.id === productId)
@@ -69,7 +53,7 @@ export function PurchaseOrderReceiveDialog({
       selectedItems: purchaseOrder.items.map((item) => (selectedItemId ? item.id === selectedItemId : true)),
       lines: purchaseOrder.items.map((item) => ({
         purchase_order_item_id: item.id,
-        quantity_received: getRemainingQuantity(item.product_id, item.quantity),
+        quantity_received: item.quantity_remaining,
         location_type: "warehouse",
         location_id: "",
       })),
@@ -205,7 +189,7 @@ export function PurchaseOrderReceiveDialog({
               </TableHeader>
               <TableBody>
                 {purchaseOrder.items.map((item, index) => {
-                  const remaining = getRemainingQuantity(item.product_id, item.quantity)
+                  const remaining = Number.parseFloat(item.quantity_remaining || "0").toFixed(2)
                   const isSelected = watch(`selectedItems.${index}`)
                   return (
                     <TableRow key={item.id} className={!isSelected ? "opacity-50" : ""}>

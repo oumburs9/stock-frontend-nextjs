@@ -37,9 +37,10 @@ export default function PurchaseOrderDetailPage() {
   const [selectedItemForReceive, setSelectedItemForReceive] = useState<string | null>(null)
 
   const { data: poData, isLoading } = usePurchaseOrder(id)
+  console.log("poData: ", poData)
   const { data: suppliersData = [] } = usePartners("supplier")
   const { data: productsData = [] } = useProducts()
-  const { data: batchesData = [] } = useBatches()
+
 
   const approveMutation = useApprovePurchaseOrder()
   const cancelMutation = useCancelPurchaseOrder()
@@ -58,20 +59,6 @@ export default function PurchaseOrderDetailPage() {
   const getSupplierName = (supplierId: string) => {
     const supplier = suppliers.find((s) => s.id === supplierId)
     return supplier?.name || "Unknown Supplier"
-  }
-  const getReceivedQuantity = (productId: string) => {
-    const productBatches = batches.filter((b: any) => b.product_id === productId && !b.shipment_id)
-    const total = productBatches.reduce((sum: number, b: any) => {
-      return sum + Number.parseFloat(b.quantity_received || "0")
-    }, 0)
-    return total.toFixed(2)
-  }
-
-  const getRemainingQuantity = (productId: string, orderedQty: string) => {
-    const received = Number.parseFloat(getReceivedQuantity(productId))
-    const ordered = Number.parseFloat(orderedQty || "0")
-    const remaining = Math.max(0, ordered - received)
-    return remaining.toFixed(2)
   }
 
   const handleApprove = async () => {
@@ -143,7 +130,7 @@ export default function PurchaseOrderDetailPage() {
   const po = poData
   const suppliers = suppliersData ?? []
   const products = productsData ?? []
-  const batches = batchesData ?? []
+ 
 
 
   const canReceive = po.status === "approved"
@@ -289,9 +276,9 @@ export default function PurchaseOrderDetailPage() {
                 {filteredItems.length > 0 ? (
                   <>
                     {filteredItems.map((item) => {
-                      const received = getReceivedQuantity(item.product_id)
-                      const remaining = getRemainingQuantity(item.product_id, item.quantity)
-                      const hasRemaining = Number.parseFloat(remaining) > 0
+                      const received = Number.parseFloat(item.quantity_received || "0").toFixed(2)
+                      const remaining = Number.parseFloat(item.quantity_remaining || "0").toFixed(2)
+                      const hasRemaining = Number.parseFloat(item.quantity_remaining || "0") > 0
                       return (
                         <TableRow key={item.id}>
                           <TableCell className="font-medium">{getProductName(item.product_id)}</TableCell>
