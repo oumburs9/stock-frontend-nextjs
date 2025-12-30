@@ -64,27 +64,6 @@ class AuthService {
     }
   }
 
-  async refreshToken(): Promise<LoginResponse> {
-    const response = await axiosInstance.post<LoginResponse>(
-      API_ENDPOINTS.auth.refresh,
-      {},
-      {
-        headers: {
-          Authorization: `Bearer ${tokenManager.getRefreshToken()}`,
-        },
-      }
-    )
-    
-    if (response.data.accessToken) {
-      tokenManager.setTokens(
-        response.data.accessToken,
-        response.data.refreshToken
-      )
-    }
-    
-    return response.data
-  }
-
   async getCurrentUser(): Promise<User | null> {
     try {
       const response = await axiosInstance.get<User>(API_ENDPOINTS.auth.me)

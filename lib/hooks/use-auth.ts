@@ -4,13 +4,16 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { authService } from "@/lib/services/auth.service"
 import { usePathname, useRouter } from "next/navigation"
 import type { LoginRequest, ChangePasswordRequest } from "@/lib/types/auth"
+import { tokenManager } from "../api/token-manager"
 
 export function useAuth() {
   const router = useRouter()
   const pathname = usePathname()
   const queryClient = useQueryClient()
   
-  const shouldFetchUser = pathname !== "/login"
+  const authReady = tokenManager.isBootstrapped()
+
+  const shouldFetchUser = authReady && pathname !== "/login"
 
   const { data: user, isLoading } = useQuery({
     queryKey: ["currentUser"],

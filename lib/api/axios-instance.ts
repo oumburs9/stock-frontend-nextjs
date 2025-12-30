@@ -6,6 +6,7 @@ import { tokenManager } from "@/lib/api/token-manager"
 export const axiosInstance = axios.create({
   baseURL: API_CONFIG.baseURL,
   timeout: API_CONFIG.timeout,
+  withCredentials: API_CONFIG.withCredentials,
   headers: {
     "Content-Type": "application/json",
   },
@@ -31,52 +32,39 @@ axiosInstance.interceptors.response.use(
       _retry?: boolean
     }
 
-    const isAuthRequest =
-      originalRequest?.url?.includes("/auth/login") ||
-      originalRequest?.url?.includes("/auth/refresh")
+    if (error.response?.status !== 401 || originalRequest._retry) {
+      return Promise.reject(error)
+    }
 
-    // If auth endpoint fails → logout immediately
-    if (isAuthRequest) {
+    originalRequest._retry = true
+
+    try {
+      // Call Next.js refresh route (NOT backend directly)
+      const refreshRes = await fetch("/api/auth/refresh", {
+        method: "POST",
+        credentials: "include",
+      })
+
+      if (!refreshRes.ok) {
+        throw new Error("Refresh failed")
+      }
+
+      const { accessToken } = await refreshRes.json()
+
+      // Update token in memory
+      tokenManager.setAccessToken(accessToken)
+
+      // Retry original request with new token
+      originalRequest.headers.Authorization = `Bearer ${accessToken}`
+
+      return axiosInstance(originalRequest)
+    } catch {
+      // Refresh failed → force logout
       tokenManager.clearTokens()
       if (typeof window !== "undefined") {
         window.location.href = "/login"
       }
       return Promise.reject(error)
     }
-
-    // Try refresh ONCE
-    if (error.response?.status === 401 && !originalRequest._retry) {
-      originalRequest._retry = true
-
-      try {
-        const refreshResponse = await axios.post(
-          `${API_CONFIG.baseURL}/auth/refresh`,
-          {},
-          {
-            headers: {
-              Authorization: `Bearer ${tokenManager.getRefreshToken()}`,
-            },
-          },
-        )
-
-        tokenManager.setTokens(refreshResponse.data)
-
-        const newToken = tokenManager.getAccessToken()
-        if (newToken) {
-          originalRequest.headers.Authorization = `Bearer ${newToken}`
-        }
-
-        return axiosInstance(originalRequest)
-      } catch {
-        // Refresh failed → logout
-        tokenManager.clearTokens()
-        if (typeof window !== "undefined") {
-          window.location.href = "/login"
-        }
-        return Promise.reject(error)
-      }
-    }
-
-    return Promise.reject(error)
-  },
+  }
 )
