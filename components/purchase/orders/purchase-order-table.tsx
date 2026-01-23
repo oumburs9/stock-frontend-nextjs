@@ -21,6 +21,7 @@ import { PurchaseOrderReceiveDialog } from "./purchase-order-receive-dialog"
 import { useToast } from "@/hooks/use-toast"
 import { useRouter } from "next/navigation"
 import type { PurchaseOrder } from "@/lib/types/purchase"
+import { useAuth } from "@/lib/hooks/use-auth"
 
 export function PurchaseOrderTable() {
   const [search, setSearch] = useState("")
@@ -32,6 +33,7 @@ export function PurchaseOrderTable() {
   const { toast } = useToast()
   const router = useRouter()
 
+  const { hasPermission } = useAuth()
   const { data: purchaseOrders, isLoading } = usePurchaseOrders({
     q: search || undefined,
     status: statusFilter || undefined,
@@ -137,6 +139,12 @@ export function PurchaseOrderTable() {
             setSelectedPO(null)
             setIsDialogOpen(true)
           }}
+          disabled={!hasPermission("purchase-order:create")}
+           title={
+            hasPermission("purchase-order:create")
+              ? "Create purchase order"
+              : "You do not have permission to create purchase orders"
+          }
         >
           <Plus className="h-4 w-4 mr-2" />
           New Purchase Order
@@ -225,20 +233,22 @@ export function PurchaseOrderTable() {
                         </DropdownMenuItem>
                         {po.status === "draft" && (
                           <>
-                            <DropdownMenuItem onClick={() => handleEdit(po)}>Edit</DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleApprove(po)}>
+                            {hasPermission("purchase-order:update") && (<DropdownMenuItem onClick={() => handleEdit(po)}>Edit</DropdownMenuItem>)}
+                            {hasPermission("purchase-order:approve") && (<DropdownMenuItem onClick={() => handleApprove(po)}>
                               <CheckCircle className="h-4 w-4 mr-2" />
                               Approve
-                            </DropdownMenuItem>
+                            </DropdownMenuItem>)}
                           </>
                         )}
-                        {po.status === "approved" && (
+                        {po.status === "approved" && hasPermission("purchase-order:receive") &&
+                          hasPermission("purchase-order:cancel") && (
                           <DropdownMenuItem onClick={() => handleReceive(po)}>
                             <PackageCheck className="h-4 w-4 mr-2" />
                             Receive
                           </DropdownMenuItem>
                         )}
-                        {(po.status === "draft" || po.status === "approved") && (
+                        {(po.status === "draft" || po.status === "approved") &&
+                          hasPermission("purchase-order:cancel") && (
                           <>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem onClick={() => handleCancel(po)} className="text-destructive">

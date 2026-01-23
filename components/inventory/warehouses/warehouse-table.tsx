@@ -18,6 +18,7 @@ import { WarehouseFormDialog } from "./warehouse-form-dialog"
 import { ConfirmDeleteDialog } from "@/components/shared/confirm-delete-dialog"
 import type { Warehouse } from "@/lib/types/inventory"
 import { useRouter } from "next/navigation"
+import { useAuth } from "@/lib/hooks/use-auth"
 
 export function WarehouseTable() {
   const [search, setSearch] = useState("")
@@ -27,6 +28,7 @@ export function WarehouseTable() {
   const [page, setPage] = useState(1)
   const router = useRouter()
 
+  const { hasPermission } = useAuth()
   const { data: warehouses, isLoading } = useWarehouses()
   const deleteMutation = useDeleteWarehouse()
 
@@ -76,15 +78,16 @@ export function WarehouseTable() {
             className="pl-9"
           />
         </div>
-        <Button
-          onClick={() => {
-            setSelectedWarehouse(null)
-            setIsDialogOpen(true)
-          }}
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Add Warehouse
-        </Button>
+        {hasPermission("warehouse:create") && (
+          <Button
+            onClick={() => {
+              setSelectedWarehouse(null)
+              setIsDialogOpen(true)
+            }}
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Add Warehouse
+          </Button>)}
       </div>
 
       <div className="rounded-md border">
@@ -130,14 +133,14 @@ export function WarehouseTable() {
                       <DropdownMenuContent align="end">
                         <DropdownMenuLabel>Actions</DropdownMenuLabel>
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={() => handleEdit(warehouse)}>Edit</DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleViewDetails(warehouse.id)}>
+                        {hasPermission("warehouse:update") && (<DropdownMenuItem onClick={() => handleEdit(warehouse)}>Edit</DropdownMenuItem>)}
+                        {hasPermission("warehouse:view") && (<DropdownMenuItem onClick={() => handleViewDetails(warehouse.id)}>
                           View Details
-                        </DropdownMenuItem>
+                        </DropdownMenuItem>)}
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={() => handleDelete(warehouse)} className="text-destructive">
+                        {hasPermission("warehouse:delete") && (<DropdownMenuItem onClick={() => handleDelete(warehouse)} className="text-destructive">
                           Delete
-                        </DropdownMenuItem>
+                        </DropdownMenuItem>)}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>

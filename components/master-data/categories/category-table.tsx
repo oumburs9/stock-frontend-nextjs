@@ -18,6 +18,7 @@ import {
 import { CategoryFormDialog } from "./category-form-dialog"
 import { ConfirmDeleteDialog } from "@/components/shared/confirm-delete-dialog"
 import type { Category } from "@/lib/types/master-data"
+import { useAuth } from "@/lib/hooks/use-auth"
 
 export function CategoryTable() {
   const router = useRouter()
@@ -27,6 +28,7 @@ export function CategoryTable() {
   const [categoryToDelete, setCategoryToDelete] = useState<Category | null>(null)
   const [page, setPage] = useState(1)
 
+  const { hasPermission } = useAuth()
   const { data: categories, isLoading } = useCategories()
   const deleteMutation = useDeleteCategory()
 
@@ -74,15 +76,16 @@ export function CategoryTable() {
             className="pl-9"
           />
         </div>
-        <Button
-          onClick={() => {
-            setSelectedCategory(null)
-            setIsDialogOpen(true)
-          }}
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Add Category
-        </Button>
+        {hasPermission("category:create") && (
+          <Button
+            onClick={() => {
+              setSelectedCategory(null)
+              setIsDialogOpen(true)
+            }}
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Add Category
+          </Button>)}
       </div>
 
       <div className="rounded-md border">
@@ -140,11 +143,11 @@ export function CategoryTable() {
                           <Eye className="h-4 w-4 mr-2" />
                           View Details
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleEdit(category)}>Edit</DropdownMenuItem>
+                        {hasPermission("category:update") && (<DropdownMenuItem onClick={() => handleEdit(category)}>Edit</DropdownMenuItem>)}
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={() => handleDelete(category)} className="text-destructive">
+                        {hasPermission("category:delete") && (<DropdownMenuItem onClick={() => handleDelete(category)} className="text-destructive">
                           Delete
-                        </DropdownMenuItem>
+                        </DropdownMenuItem>)}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>

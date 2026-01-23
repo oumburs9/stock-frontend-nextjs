@@ -7,6 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button"
 import { Loader2, DollarSign } from "lucide-react"
 import { AddBatchExpenseDialog } from "./add-batch-expense-dialog"
+import { useAuth } from "@/lib/hooks/use-auth"
 
 interface BatchViewerProps {
   productId: string
@@ -16,6 +17,7 @@ export function BatchViewer({ productId }: BatchViewerProps) {
   const { data: batches, isLoading } = useBatchesByProduct(productId)
   const [selectedBatchId, setSelectedBatchId] = useState<string | null>(null)
   const [isExpenseDialogOpen, setIsExpenseDialogOpen] = useState(false)
+  const { hasPermission } = useAuth()
 
   if (isLoading) {
     return (
@@ -81,10 +83,10 @@ export function BatchViewer({ productId }: BatchViewerProps) {
                       ETB {Number.parseFloat(batch.landed_unit_cost).toFixed(2)}
                     </TableCell>
                     <TableCell>
-                      <Button size="sm" variant="outline" onClick={() => handleAddExpense(batch.id)}>
+                      {hasPermission("product-batch-expense:add") && (<Button size="sm" variant="outline" onClick={() => handleAddExpense(batch.id)}>
                         <DollarSign className="h-3 w-3 mr-1" />
                         Add Expense
-                      </Button>
+                      </Button>)}
                     </TableCell>
                   </TableRow>
                 ))}

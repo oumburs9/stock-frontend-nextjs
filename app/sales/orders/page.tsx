@@ -10,11 +10,15 @@ import { Input } from "@/components/ui/input"
 import { Plus, Search, X } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Card, CardContent } from "@/components/ui/card"
+import { RequirePermission } from "@/components/auth/require-permission"
+import { useAuth } from "@/lib/hooks/use-auth"
 
 export default function SalesOrdersPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>("all")
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
+
+  const { hasPermission } = useAuth()
 
   const clearFilters = () => {
     setSearchQuery("")
@@ -25,15 +29,17 @@ export default function SalesOrdersPage() {
 
   return (
     <DashboardLayout>
+      <RequirePermission permission="sales-order:view">
       <div className="space-y-6">
         <PageHeader
           title="Sales Orders"
           description="Manage customer orders and deliveries"
           action={
+            hasPermission('sales-order:create') && (
             <Button onClick={() => setIsCreateDialogOpen(true)}>
               <Plus className="mr-2 h-4 w-4" />
               Create Sales Order
-            </Button>
+            </Button>)
           }
         />
 
@@ -77,6 +83,7 @@ export default function SalesOrdersPage() {
 
         <SalesOrderFormDialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen} />
       </div>
+      </RequirePermission>
     </DashboardLayout>
   )
 }

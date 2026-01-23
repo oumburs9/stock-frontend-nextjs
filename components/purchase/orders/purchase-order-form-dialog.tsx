@@ -14,6 +14,7 @@ import { useToast } from "@/hooks/use-toast"
 import { Plus, Trash2 } from "lucide-react"
 import { SearchableCombobox } from "@/components/shared/searchable-combobox"
 import type { PurchaseOrder, CreatePurchaseOrderRequest } from "@/lib/types/purchase"
+import { useAuth } from "@/lib/hooks/use-auth"
 
 interface PurchaseOrderFormDialogProps {
   purchaseOrder: PurchaseOrder | null
@@ -27,6 +28,7 @@ export function PurchaseOrderFormDialog({ purchaseOrder, open, onOpenChange }: P
   const updateMutation = useUpdatePurchaseOrder()
   const { data: products } = useProducts()
   const { data: suppliers } = usePartners("supplier")
+  const { hasPermission } = useAuth()
 
   const {
     register,
@@ -269,7 +271,16 @@ export function PurchaseOrderFormDialog({ purchaseOrder, open, onOpenChange }: P
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending}>
+            <Button 
+              type="submit" 
+              disabled={
+                Boolean(
+                  createMutation.isPending || updateMutation.isPending ||
+                  (!purchaseOrder && !hasPermission("purchase-order:create")) ||
+                  (purchaseOrder !== null && !hasPermission("purchase-order:update"))
+                )
+              }
+              >
               {createMutation.isPending || updateMutation.isPending ? "Saving..." : "Save"}
             </Button>
           </DialogFooter>

@@ -17,6 +17,7 @@ import {
 import { ConfirmDeleteDialog } from "@/components/shared/confirm-delete-dialog"
 import { PermissionFormDialog } from "./permission-form-dialog"
 import type { Permission } from "@/lib/types/permission"
+import { useAuth } from "@/lib/hooks/use-auth"
 
 export function PermissionTable() {
   const [search, setSearch] = useState("")
@@ -24,6 +25,7 @@ export function PermissionTable() {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [permissionToDelete, setPermissionToDelete] = useState<Permission | null>(null)
 
+  const { hasPermission } = useAuth()
   const { data: permissions, isLoading } = usePermissions()
   const deleteMutation = useDeletePermission()
 
@@ -66,6 +68,7 @@ export function PermissionTable() {
             className="pl-9"
           />
         </div>
+        {hasPermission("permission:create") && (
         <Button
           onClick={() => {
             setSelectedPermission(null)
@@ -74,7 +77,7 @@ export function PermissionTable() {
         >
           <Plus className="h-4 w-4 mr-2" />
           Add Permission
-        </Button>
+        </Button>)}
       </div>
 
       <div className="rounded-md border">
@@ -114,11 +117,11 @@ export function PermissionTable() {
                       <DropdownMenuContent align="end">
                         <DropdownMenuLabel>Actions</DropdownMenuLabel>
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={() => handleEdit(permission)}>Edit</DropdownMenuItem>
+                        {hasPermission("permission:update") && (<DropdownMenuItem onClick={() => handleEdit(permission)}>Edit</DropdownMenuItem>)}
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={() => handleDelete(permission)} className="text-destructive">
+                        {hasPermission("permission:delete") && (<DropdownMenuItem onClick={() => handleDelete(permission)} className="text-destructive">
                           Delete
-                        </DropdownMenuItem>
+                        </DropdownMenuItem>)}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>

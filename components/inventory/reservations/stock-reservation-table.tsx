@@ -27,6 +27,7 @@ import {
 import { Card, CardContent } from "@/components/ui/card"
 import type { StockReservation } from "@/lib/types/inventory"
 import { useSalesOrders } from "@/lib/hooks/use-sales"
+import { useAuth } from "@/lib/hooks/use-auth"
 
 export function StockReservationTable() {
   const [search, setSearch] = useState("")
@@ -34,6 +35,7 @@ export function StockReservationTable() {
   const [open, setOpen] = useState(false)
   const [selectedReservation, setSelectedReservation] = useState<StockReservation | null>(null)
 
+  const { hasPermission } = useAuth()
   const { data: reservations, isLoading } = useStockReservations()
   const {data: salesOrders} = useSalesOrders()
   // console.log('salesOrders: ',salesOrders)
@@ -76,10 +78,11 @@ export function StockReservationTable() {
             className="pl-9"
           />
         </div>
-        <Button onClick={() => setOpen(true)}>
-          <Plus className="h-4 w-4 mr-2" />
-          New Reservation
-        </Button>
+        {hasPermission("stock.reservation:create") && (
+          <Button onClick={() => setOpen(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            New Reservation
+          </Button>)}
       </div>
 
       <div className="rounded-md border">
@@ -134,20 +137,21 @@ export function StockReservationTable() {
                         <DropdownMenuSeparator />
                         {res.status === "active" && (
                           <>
+                          {hasPermission("stock.reservation:consume") && (
                             <DropdownMenuItem
                               onClick={() => consumeMutation.mutate(res.id)}
                               disabled={consumeMutation.isPending}
                             >
                               <Check className="h-4 w-4 mr-2" />
                               Consume
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
+                            </DropdownMenuItem>)}
+                            {hasPermission("stock.reservation:release") && (<DropdownMenuItem
                               onClick={() => releaseMutation.mutate(res.id)}
                               disabled={releaseMutation.isPending}
                             >
                               <X className="h-4 w-4 mr-2" />
                               Release
-                            </DropdownMenuItem>
+                            </DropdownMenuItem>)}
                           </>
                         )}
                       </DropdownMenuContent>

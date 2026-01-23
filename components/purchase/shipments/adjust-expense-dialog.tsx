@@ -11,6 +11,7 @@ import { useToast } from "@/hooks/use-toast"
 import type { ShipmentExpense } from "@/lib/types/purchase"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { InfoIcon } from "lucide-react"
+import { useAuth } from "@/lib/hooks/use-auth"
 
 interface AdjustShipmentExpenseDialogProps {
   expense: ShipmentExpense
@@ -26,6 +27,7 @@ export function AdjustShipmentExpenseDialog({
   onOpenChange,
 }: AdjustShipmentExpenseDialogProps) {
   const { toast } = useToast()
+  const { hasPermission } = useAuth()
   const adjustMutation = useAddShipmentExpenseAdjustment()
 
   const canAdjust = !["received", "closed"].includes(shipmentStatus)
@@ -136,7 +138,13 @@ export function AdjustShipmentExpenseDialog({
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={adjustMutation.isPending || !canAdjust}>
+            <Button 
+              type="submit" 
+              disabled={
+                adjustMutation.isPending || !canAdjust ||
+                !hasPermission("purchase-shipment-expense:adjust")
+                }
+                >
               {adjustMutation.isPending ? "Adjusting..." : "Add Adjustment"}
             </Button>
           </DialogFooter>

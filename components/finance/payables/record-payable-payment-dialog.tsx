@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import type { Payable, CreatePayablePaymentRequest } from "@/lib/types/finance"
+import { useAuth } from "@/lib/hooks/use-auth"
 
 interface RecordPayablePaymentDialogProps {
   open: boolean
@@ -20,6 +21,7 @@ interface RecordPayablePaymentDialogProps {
 export function RecordPayablePaymentDialog({ open, payable, onOpenChange }: RecordPayablePaymentDialogProps) {
   const createMutation = useCreatePayablePayment()
   const { data: paymentSources = [] } = usePaymentSources()
+  const { hasPermission } = useAuth()
 
   const {
     register,
@@ -53,6 +55,7 @@ export function RecordPayablePaymentDialog({ open, payable, onOpenChange }: Reco
   }, [payable, open, reset])
 
   const onSubmit = async (data: CreatePayablePaymentRequest) => {
+    if (!hasPermission("payable:record-payment")) return
     await createMutation.mutateAsync(data)
     onOpenChange(false)
   }

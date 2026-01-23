@@ -28,6 +28,7 @@ import {
 import { MoreHorizontal, Pencil, Trash2, Power, PowerOff, ChevronLeft, ChevronRight } from "lucide-react"
 import { PricingRuleFormDialog } from "./pricing-rule-form-dialog"
 import { Skeleton } from "@/components/ui/skeleton"
+import { useAuth } from "@/lib/hooks/use-auth"
 
 export function PricingRulesTable() {
   const router = useRouter()
@@ -38,6 +39,7 @@ export function PricingRulesTable() {
   const [editingRule, setEditingRule] = useState<PricingRule | null>(null)
   const [deletingRuleId, setDeletingRuleId] = useState<string | null>(null)
   const [page, setPage] = useState(1)
+  const { hasPermission } = useAuth()
 
   const itemsPerPage = 10
   const startIndex = (page - 1) * itemsPerPage
@@ -156,11 +158,13 @@ export function PricingRulesTable() {
                     <DropdownMenuContent align="end">
                       <DropdownMenuLabel>Actions</DropdownMenuLabel>
                       <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={() => setEditingRule(rule)}>
+                      {hasPermission("pricing-rule:update") && (<DropdownMenuItem onClick={() => setEditingRule(rule)}>
                         <Pencil className="mr-2 h-4 w-4" />
                         Edit
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => handleToggleActive(rule)}>
+                      </DropdownMenuItem>)}
+                      {/* {hasPermission("pricing-rule:update-status") && ( */}
+                      {hasPermission("pricing-rule:update") && (
+                        <DropdownMenuItem onClick={() => handleToggleActive(rule)}>
                         {rule.is_active ? (
                           <>
                             <PowerOff className="mr-2 h-4 w-4" />
@@ -172,12 +176,16 @@ export function PricingRulesTable() {
                             Activate
                           </>
                         )}
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={() => setDeletingRuleId(rule.id)} className="text-destructive">
-                        <Trash2 className="mr-2 h-4 w-4" />
-                        Delete
-                      </DropdownMenuItem>
+                      </DropdownMenuItem>)}
+                      {hasPermission("pricing-rule:delete") && (
+                        <>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem onClick={() => setDeletingRuleId(rule.id)} className="text-destructive">
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Delete
+                          </DropdownMenuItem>
+                        </>
+                      )}
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </TableCell>

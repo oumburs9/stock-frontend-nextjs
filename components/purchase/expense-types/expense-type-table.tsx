@@ -18,6 +18,7 @@ import { Badge } from "@/components/ui/badge"
 import { ExpenseTypeFormDialog } from "./expense-type-form-dialog"
 import { ConfirmDeleteDialog } from "@/components/shared/confirm-delete-dialog"
 import type { ExpenseType } from "@/lib/types/purchase"
+import { useAuth } from "@/lib/hooks/use-auth"
 
 export function ExpenseTypeTable() {
   const [search, setSearch] = useState("")
@@ -28,6 +29,7 @@ export function ExpenseTypeTable() {
   const [expenseTypeToDelete, setExpenseTypeToDelete] = useState<ExpenseType | null>(null)
     const [page, setPage] = useState(1)
 
+  const { hasPermission } = useAuth()
   const { data: expenseTypes, isLoading } = useExpenseTypes({
     q: search || undefined,
     scope: scopeFilter || undefined,
@@ -45,6 +47,8 @@ export function ExpenseTypeTable() {
   }
 
   const confirmDelete = () => {
+    if (!hasPermission("purchase-expense-type:delete")) return
+
     if (expenseTypeToDelete) {
       deleteMutation.mutate(expenseTypeToDelete.id)
     }
@@ -70,15 +74,16 @@ export function ExpenseTypeTable() {
             className="pl-9"
           />
         </div>
-        <Button
-          onClick={() => {
-            setSelectedExpenseType(null)
-            setIsDialogOpen(true)
-          }}
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          New Expense Type
-        </Button>
+        {hasPermission("purchase-expense-type:create") && (
+          <Button
+            onClick={() => {
+              setSelectedExpenseType(null)
+              setIsDialogOpen(true)
+            }}
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            New Expense Type
+          </Button>)}
       </div>
 
       <div className="flex gap-2 flex-wrap items-center">
@@ -173,11 +178,11 @@ export function ExpenseTypeTable() {
                       <DropdownMenuContent align="end">
                         <DropdownMenuLabel>Actions</DropdownMenuLabel>
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={() => handleEdit(expenseType)}>Edit</DropdownMenuItem>
+                        {hasPermission("purchase-expense-type:update") && (<DropdownMenuItem onClick={() => handleEdit(expenseType)}>Edit</DropdownMenuItem>)}
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={() => handleDelete(expenseType)} className="text-destructive">
+                        {hasPermission("purchase-expense-type:delete") && (<DropdownMenuItem onClick={() => handleDelete(expenseType)} className="text-destructive">
                           Delete
-                        </DropdownMenuItem>
+                        </DropdownMenuItem>)}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>

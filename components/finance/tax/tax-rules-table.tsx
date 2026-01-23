@@ -26,6 +26,7 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { TaxRuleFormDialog } from "./tax-rule-form-dialog"
 import type { TaxRule } from "@/lib/types/finance"
+import { useAuth } from "@/lib/hooks/use-auth"
 
 export function TaxRulesTable() {
   const [page, setPage] = useState(1)
@@ -33,6 +34,7 @@ export function TaxRulesTable() {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [ruleToDelete, setRuleToDelete] = useState<TaxRule | null>(null)
 
+  const { hasPermission } = useAuth()
   const { data: taxRules, isLoading } = useTaxRules()
   const deleteMutation = useDeleteTaxRule()
 
@@ -104,15 +106,15 @@ export function TaxRulesTable() {
                       <DropdownMenuContent align="end">
                         <DropdownMenuLabel>Actions</DropdownMenuLabel>
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={() => handleEdit(rule)}>
+                        {hasPermission('tax-rule:update') && (<DropdownMenuItem onClick={() => handleEdit(rule)}>
                           <Pencil className="h-4 w-4 mr-2" />
                           Edit
-                        </DropdownMenuItem>
+                        </DropdownMenuItem>)}
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={() => setRuleToDelete(rule)} className="text-destructive">
+                        {hasPermission('tax-rule:delete') && (<DropdownMenuItem onClick={() => setRuleToDelete(rule)} className="text-destructive">
                           <Trash className="h-4 w-4 mr-2" />
                           Delete
-                        </DropdownMenuItem>
+                        </DropdownMenuItem>)}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>

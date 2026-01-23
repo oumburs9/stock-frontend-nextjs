@@ -16,6 +16,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import type { Shop } from "@/lib/types/inventory"
+import { useAuth } from "@/lib/hooks/use-auth"
 
 interface ShopFormDialogProps {
   shop: Shop | null
@@ -30,8 +31,13 @@ export function ShopFormDialog({ shop, open, onOpenChange }: ShopFormDialogProps
     description: "",
   })
 
+  const { hasPermission } = useAuth()
   const createMutation = useCreateShop()
   const updateMutation = useUpdateShop()
+
+  const canSubmit = shop
+    ? hasPermission("shop:update")
+    : hasPermission("shop:create")
 
   useEffect(() => {
     if (shop) {
@@ -119,7 +125,7 @@ export function ShopFormDialog({ shop, open, onOpenChange }: ShopFormDialogProps
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending}>
+            <Button type="submit" disabled={!canSubmit || createMutation.isPending || updateMutation.isPending}>
               {createMutation.isPending || updateMutation.isPending ? "Saving..." : shop ? "Update" : "Create"}
             </Button>
           </DialogFooter>

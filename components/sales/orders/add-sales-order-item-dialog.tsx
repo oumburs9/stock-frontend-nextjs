@@ -19,6 +19,7 @@ import { formatCurrency } from "@/lib/utils/currency"
 import type { AddSalesOrderItemRequest } from "@/lib/types/sales"
 import { useToast } from "@/components/ui/use-toast"
 import { cn } from "@/lib/utils"
+import { useAuth } from "@/lib/hooks/use-auth"
 
 interface AddSalesOrderItemDialogProps {
   salesOrderId: string
@@ -40,6 +41,7 @@ export function AddSalesOrderItemDialog({
   const [manualPriceEdit, setManualPriceEdit] = useState(false)
   const [selectedTaxRuleId, setSelectedTaxRuleId] = useState<string | null>(null)
 
+  const { hasPermission } = useAuth()
   const { data: products } = useProducts()
   const { data: priceQuote } = usePriceQuote(selectedProductId)
   const addItemMutation = useAddSalesOrderItem()

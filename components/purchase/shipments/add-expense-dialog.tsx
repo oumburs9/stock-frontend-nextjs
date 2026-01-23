@@ -12,6 +12,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { SearchableCombobox } from "@/components/shared/searchable-combobox"
 import type { AddShipmentExpenseRequest } from "@/lib/types/purchase"
 import { useToast } from "@/hooks/use-toast"
+import { useAuth } from "@/lib/hooks/use-auth"
 
 interface AddExpenseDialogProps {
   shipmentId: string
@@ -23,8 +24,9 @@ export function AddExpenseDialog({ shipmentId, open, onOpenChange }: AddExpenseD
   const { toast } = useToast()
   const addExpenseMutation = useAddShipmentExpense()
 
+  const { hasPermission } = useAuth()
   const { data: expenseTypes = [] } = useExpenseTypes({ scope: "shipment", active: true})
-  console.log("expenseTypes: " ,expenseTypes )
+  // console.log("expenseTypes: " ,expenseTypes )
 
   const [selectedExpenseType, setSelectedExpenseType] = useState<string>("")
 
@@ -134,7 +136,15 @@ export function AddExpenseDialog({ shipmentId, open, onOpenChange }: AddExpenseD
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={addExpenseMutation.isPending || !selectedExpenseType}>
+            <Button 
+              type="submit" 
+              disabled={
+                Boolean(
+                addExpenseMutation.isPending || !selectedExpenseType ||
+                !hasPermission("purchase-shipment-expense:add")
+                )
+              }
+                >
               {addExpenseMutation.isPending ? "Adding..." : "Add Expense"}
             </Button>
           </DialogFooter>

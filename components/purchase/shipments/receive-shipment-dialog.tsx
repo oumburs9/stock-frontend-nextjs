@@ -15,6 +15,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Plus, Trash2 } from "lucide-react"
 import type { PurchaseShipment, ReceiveShipmentRequest } from "@/lib/types/purchase"
 import { useProducts } from "@/lib/hooks/use-products"
+import { useAuth } from "@/lib/hooks/use-auth"
 
 interface ReceiveShipmentDialogProps {
   shipment: PurchaseShipment
@@ -31,6 +32,7 @@ export function ReceiveShipmentDialog({ shipment, selectedItemId, open, onOpenCh
   const [showPostings, setShowPostings] = useState(false)
   const [postings, setPostings] = useState<any>(null)
   const { data: products } = useProducts()
+  const { hasPermission } = useAuth()
 
   const getProductName = (productrId: string) => {
     const supplier = products?.find((s) => s.id === productrId)
@@ -233,7 +235,12 @@ export function ReceiveShipmentDialog({ shipment, selectedItemId, open, onOpenCh
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={receiveMutation.isPending}>
+            <Button 
+              type="submit" 
+              disabled={
+                receiveMutation.isPending ||
+                !hasPermission("purchase-shipment:receive")
+                }>
               {receiveMutation.isPending ? "Receiving..." : "Receive Items"}
             </Button>
           </DialogFooter>

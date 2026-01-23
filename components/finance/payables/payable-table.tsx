@@ -20,6 +20,7 @@ import { Card } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { RecordPayablePaymentDialog } from "./record-payable-payment-dialog"
 import type { Payable } from "@/lib/types/finance"
+import { useAuth } from "@/lib/hooks/use-auth"
 
 interface PayableTableProps {
   searchQuery: string
@@ -36,6 +37,7 @@ export function PayableTable({ searchQuery, statusFilter }: PayableTableProps) {
 
   const { data: payables, isLoading, error } = usePayables()
   const { data: suppliers } = usePartners("supplier")
+  const { hasPermission } = useAuth()
 
   const filteredPayables = payables?.filter((pay) => {
     const matchesSearch =
@@ -130,7 +132,7 @@ export function PayableTable({ searchQuery, statusFilter }: PayableTableProps) {
                             <Eye className="h-4 w-4 mr-2" />
                             View Details
                           </DropdownMenuItem>
-                          {payable.status !== "paid" && (
+                          {hasPermission("payable:record-payment") && payable.status !== "paid" && (
                             <DropdownMenuItem onClick={() => setPaymentDialog({ open: true, payable })}>
                               <DollarSign className="h-4 w-4 mr-2" />
                               Record Payment

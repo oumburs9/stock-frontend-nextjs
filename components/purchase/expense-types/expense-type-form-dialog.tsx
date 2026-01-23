@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useToast } from "@/hooks/use-toast"
 import type { ExpenseType, CreateExpenseTypeRequest, UpdateExpenseTypeRequest } from "@/lib/types/purchase"
+import { useAuth } from "@/lib/hooks/use-auth"
 
 interface ExpenseTypeFormDialogProps {
   expenseType: ExpenseType | null
@@ -20,6 +21,8 @@ export function ExpenseTypeFormDialog({ expenseType, open, onOpenChange }: Expen
   const { toast } = useToast()
   const createMutation = useCreateExpenseType()
   const updateMutation = useUpdateExpenseType()
+
+  const { hasPermission } = useAuth()
 
   const {
     register,
@@ -132,7 +135,17 @@ export function ExpenseTypeFormDialog({ expenseType, open, onOpenChange }: Expen
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending}>
+            <Button
+              type="submit"
+              disabled={
+                Boolean(
+                  createMutation.isPending ||
+                  updateMutation.isPending ||
+                  (!expenseType && !hasPermission("purchase-expense-type:create")) ||
+                  (expenseType !== null && !hasPermission("purchase-expense-type:update"))
+                )
+              }
+            >
               {createMutation.isPending || updateMutation.isPending ? "Saving..." : "Save"}
             </Button>
           </DialogFooter>

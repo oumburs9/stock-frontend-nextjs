@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label"
 import { useToast } from "@/hooks/use-toast"
 import { formatCurrency } from "@/lib/utils/currency"
 import type { UpdateSalesOrderItemRequest, SalesOrderItem } from "@/lib/types/sales"
+import { useAuth } from "@/lib/hooks/use-auth"
 
 interface EditSalesOrderItemDialogProps {
   salesOrderId: string
@@ -21,6 +22,7 @@ interface EditSalesOrderItemDialogProps {
 export function EditSalesOrderItemDialog({ salesOrderId, item, open, onOpenChange }: EditSalesOrderItemDialogProps) {
   const { toast } = useToast()
   const updateItemMutation = useUpdateSalesOrderItem()
+  const { hasPermission } = useAuth()
 
   const {
     register,
@@ -145,7 +147,7 @@ export function EditSalesOrderItemDialog({ salesOrderId, item, open, onOpenChang
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={updateItemMutation.isPending}>
+            <Button type="submit" disabled={updateItemMutation.isPending || !hasPermission('sales-order-item:update')}>
               {updateItemMutation.isPending ? "Updating..." : "Update"}
             </Button>
           </DialogFooter>

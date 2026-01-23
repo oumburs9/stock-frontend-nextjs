@@ -14,6 +14,7 @@ import { useToast } from "@/hooks/use-toast"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { SearchableCombobox } from "@/components/shared/searchable-combobox"
 import type { PurchaseOrder, ReceivePurchaseOrderRequest } from "@/lib/types/purchase"
+import { useAuth } from "@/lib/hooks/use-auth"
 
 interface PurchaseOrderReceiveDialogProps {
   purchaseOrder: PurchaseOrder
@@ -35,6 +36,7 @@ export function PurchaseOrderReceiveDialog({
   const { data: products } = useProducts()
   const [showPostings, setShowPostings] = useState(false)
   const [postings, setPostings] = useState<any>(null)
+  const { hasPermission } = useAuth()
 
   const getProductName = (productId: string) => {
     const product = products?.find((p) => p.id === productId)
@@ -267,7 +269,7 @@ export function PurchaseOrderReceiveDialog({
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={receiveMutation.isPending}>
+            <Button type="submit" disabled={receiveMutation.isPending || !hasPermission("purchase-order:receive")}>
               {receiveMutation.isPending ? "Receiving..." : "Receive Selected Items"}
             </Button>
           </DialogFooter>

@@ -35,6 +35,7 @@ import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import { ConfirmDeleteDialog } from "@/components/shared/confirm-delete-dialog"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { useAuth } from "@/lib/hooks/use-auth"
 
 export function AttributeSetDetailContent({ id }: { id: string }) {
   const router = useRouter()
@@ -44,6 +45,7 @@ export function AttributeSetDetailContent({ id }: { id: string }) {
   const [itemsToDelete, setItemsToDelete] = useState<Set<string>>(new Set())
   const [itemToDelete, setItemToDelete] = useState<{ id: string; name: string } | null>(null)
 
+  const { hasPermission } = useAuth()
   const { data: set, isLoading } = useAttributeSet(id)
   const { data: items } = useSetItems(id)
   const { data: allAttributes } = useAttributes()
@@ -145,14 +147,16 @@ export function AttributeSetDetailContent({ id }: { id: string }) {
             </div>
             <div className="flex gap-2">
               {itemsToDelete.size > 0 && (
-                <Button variant="destructive" onClick={handleBulkRemoveItems} disabled={bulkRemoveMutation.isPending}>
-                  Remove {itemsToDelete.size} Selected
-                </Button>
+                hasPermission("attribute-set:assign-attribute") && (
+                  <Button variant="destructive" onClick={handleBulkRemoveItems} disabled={bulkRemoveMutation.isPending}>
+                    Remove {itemsToDelete.size} Selected
+                  </Button>)
               )}
-              <Button onClick={() => setIsAddDialogOpen(true)}>
-                <Plus className="h-4 w-4 mr-2" />
-                Add Attributes
-              </Button>
+              {hasPermission("attribute-set:assign-attribute") && (
+                <Button onClick={() => setIsAddDialogOpen(true)}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Attributes
+                </Button>)}
             </div>
           </div>
         </CardHeader>
@@ -165,6 +169,7 @@ export function AttributeSetDetailContent({ id }: { id: string }) {
                     <TableHead className="w-12">
                       <input
                         type="checkbox"
+                        disabled={!hasPermission("attribute-set:assign-attribute")}
                         checked={itemsToDelete.size > 0 && itemsToDelete.size === items.length}
                         onChange={(e) => {
                           if (e.target.checked) {
@@ -191,6 +196,7 @@ export function AttributeSetDetailContent({ id }: { id: string }) {
                         <Checkbox
                           checked={itemsToDelete.has(item.id)}
                           onCheckedChange={() => handleToggleItemDelete(item.id)}
+                          disabled={!hasPermission("attribute-set:assign-attribute")}
                         />
                       </TableCell>
                       <TableCell>{item.sort_order}</TableCell>
@@ -210,12 +216,12 @@ export function AttributeSetDetailContent({ id }: { id: string }) {
                           <DropdownMenuContent align="end">
                             <DropdownMenuLabel>Actions</DropdownMenuLabel>
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem
+                            {hasPermission("attribute-set:assign-attribute") && (<DropdownMenuItem
                               onClick={() => handleRemoveItem(item.id, item.attribute?.label || "")}
                               className="text-destructive"
                             >
                               Remove
-                            </DropdownMenuItem>
+                            </DropdownMenuItem>)}
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>

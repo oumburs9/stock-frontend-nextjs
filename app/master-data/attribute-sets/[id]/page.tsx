@@ -1,3 +1,4 @@
+import { RequirePermission } from "@/components/auth/require-permission"
 import { DashboardLayout } from "@/components/layout/dashboard-layout"
 import { AttributeSetDetailContent } from "@/components/master-data/attribute-sets/attribute-set-detail-content"
 
@@ -6,7 +7,9 @@ export default async function AttributeSetDetailPage({ params }: { params: Promi
 
   return (
     <DashboardLayout>
-      <AttributeSetDetailContent id={id} />
+      <RequirePermission permission="attribute-set:view">
+        <AttributeSetDetailContent id={id} />
+      </RequirePermission>
     </DashboardLayout>
   )
 }

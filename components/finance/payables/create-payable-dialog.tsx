@@ -14,6 +14,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { SearchableCombobox } from "@/components/shared/searchable-combobox"
 import type { CreatePayableRequest } from "@/lib/types/finance"
+import { useAuth } from "@/lib/hooks/use-auth"
 
 interface CreatePayableDialogProps {
   open: boolean
@@ -26,6 +27,7 @@ export function CreatePayableDialog({ open, onOpenChange }: CreatePayableDialogP
   const { data: suppliers } = usePartners("supplier")
   const { data: purchaseOrders } = usePurchaseOrders()
   const { data: shipments } = useShipments()
+  const { hasPermission } = useAuth()
 
   const {
     register,
@@ -64,6 +66,7 @@ export function CreatePayableDialog({ open, onOpenChange }: CreatePayableDialogP
   }, [open, reset])
 
   const onSubmit = async (data: CreatePayableRequest) => {
+    if (!hasPermission("payable:create")) return
     const payload: CreatePayableRequest = {
       ...data,
       purchaseShipmentId: sourceType === "shipment" ? data.purchaseShipmentId : null,

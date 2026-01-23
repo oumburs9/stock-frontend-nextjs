@@ -15,6 +15,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { SearchableCombobox } from "@/components/shared/searchable-combobox"
 import { Loader2 } from "lucide-react"
+import { useAuth } from "@/lib/hooks/use-auth"
 
 interface PricingRuleFormDialogProps {
   open: boolean
@@ -43,6 +44,7 @@ export function PricingRuleFormDialog({ open, onOpenChange, pricingRule }: Prici
   const { data: products } = useProducts()
   const { data: categories } = useCategories()
   const { data: brands } = useBrands()
+  const { hasPermission } = useAuth()
 
   const {
     register,
@@ -85,6 +87,8 @@ export function PricingRuleFormDialog({ open, onOpenChange, pricingRule }: Prici
   }, [pricingRule, reset])
 
   const onSubmit = (data: FormData) => {
+    if (pricingRule && !hasPermission("pricing-rule:update")) return
+    if (!pricingRule && !hasPermission("pricing-rule:create")) return
     const payload: any = {
       name: data.name,
       description: data.description || undefined,

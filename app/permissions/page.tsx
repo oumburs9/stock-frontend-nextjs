@@ -1,11 +1,13 @@
 "use client"
 
+import { RequirePermission } from "@/components/auth/require-permission"
 import { DashboardLayout } from "@/components/layout/dashboard-layout"
 import { PermissionTable } from "@/components/permissions/permission-table"
 
 export default function PermissionsPage() {
   return (
     <DashboardLayout>
+      <RequirePermission permission="permission:view">
       <div className="space-y-6">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Permissions</h1>
@@ -13,6 +15,7 @@ export default function PermissionsPage() {
         </div>
         <PermissionTable />
       </div>
+      </RequirePermission>
     </DashboardLayout>
   )
 }

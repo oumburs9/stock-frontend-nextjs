@@ -26,6 +26,7 @@ import {
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import type { StockAdjustment } from "@/lib/types/inventory"
+import { useAuth } from "@/lib/hooks/use-auth"
 
 export function StockAdjustmentTable() {
   const [search, setSearch] = useState("")
@@ -33,6 +34,7 @@ export function StockAdjustmentTable() {
   const [page, setPage] = useState(1)
   const [selectedAdjustment, setSelectedAdjustment] = useState<StockAdjustment | null>(null)
 
+  const { hasPermission } = useAuth()
   const { data: adjustments, isLoading } = useStockAdjustments()
 
   const filteredAdjustments = adjustments?.filter(
@@ -61,10 +63,11 @@ export function StockAdjustmentTable() {
             className="pl-9"
           />
         </div>
-        <Button onClick={() => setIsDialogOpen(true)}>
-          <Plus className="h-4 w-4 mr-2" />
-          New Adjustment
-        </Button>
+        {hasPermission("stock.adjustment:create") && (
+          <Button onClick={() => setIsDialogOpen(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            New Adjustment
+          </Button>)}
       </div>
 
       <div className="rounded-md border">

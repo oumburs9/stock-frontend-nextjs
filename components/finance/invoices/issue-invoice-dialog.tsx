@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { SearchableCombobox } from "@/components/shared/searchable-combobox"
 import type { IssueInvoiceRequest } from "@/lib/types/finance"
+import { useAuth } from "@/lib/hooks/use-auth"
 
 interface IssueInvoiceDialogProps {
   open: boolean
@@ -22,6 +23,7 @@ export function IssueInvoiceDialog({ open, onOpenChange, onSuccess }: IssueInvoi
   const issueMutation = useIssueInvoice()
   const { data: salesOrders } = useSalesOrders()
   const { data: taxRules } = useTaxRules()
+  const { hasPermission } = useAuth()
 
   const {
     register,
@@ -51,6 +53,7 @@ export function IssueInvoiceDialog({ open, onOpenChange, onSuccess }: IssueInvoi
   }, [open, reset])
 
   const onSubmit = async (data: IssueInvoiceRequest) => {
+    if (!hasPermission("invoice:issue")) return
     const result = await issueMutation.mutateAsync(data)
     onOpenChange(false)
     if (onSuccess) {

@@ -17,6 +17,7 @@ import {
 import { UnitFormDialog } from "./unit-form-dialog"
 import { ConfirmDeleteDialog } from "@/components/shared/confirm-delete-dialog"
 import type { Unit } from "@/lib/types/master-data"
+import { useAuth } from "@/lib/hooks/use-auth"
 
 export function UnitTable() {
   const [search, setSearch] = useState("")
@@ -25,6 +26,7 @@ export function UnitTable() {
   const [unitToDelete, setUnitToDelete] = useState<Unit | null>(null)
   const [page, setPage] = useState(1)
 
+  const { hasPermission } = useAuth()
   const { data: units, isLoading } = useUnits()
   const deleteMutation = useDeleteUnit()
 
@@ -69,15 +71,16 @@ export function UnitTable() {
             className="pl-9"
           />
         </div>
-        <Button
-          onClick={() => {
-            setSelectedUnit(null)
-            setIsDialogOpen(true)
-          }}
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Add Unit
-        </Button>
+        {hasPermission("unit:create") && (
+          <Button
+            onClick={() => {
+              setSelectedUnit(null)
+              setIsDialogOpen(true)
+            }}
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Add Unit
+          </Button>)}
       </div>
 
       <div className="rounded-md border">
@@ -121,11 +124,11 @@ export function UnitTable() {
                       <DropdownMenuContent align="end">
                         <DropdownMenuLabel>Actions</DropdownMenuLabel>
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={() => handleEdit(unit)}>Edit</DropdownMenuItem>
+                       {hasPermission("unit:update") && ( <DropdownMenuItem onClick={() => handleEdit(unit)}>Edit</DropdownMenuItem>)}
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={() => handleDelete(unit)} className="text-destructive">
+                        {hasPermission("unit:delete") && (<DropdownMenuItem onClick={() => handleDelete(unit)} className="text-destructive">
                           Delete
-                        </DropdownMenuItem>
+                        </DropdownMenuItem>)}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>

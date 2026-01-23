@@ -18,6 +18,7 @@ import {
 import { BrandFormDialog } from "./brand-form-dialog"
 import { ConfirmDeleteDialog } from "@/components/shared/confirm-delete-dialog"
 import type { Brand } from "@/lib/types/master-data"
+import { useAuth } from "@/lib/hooks/use-auth"
 
 export function BrandTable() {
   const router = useRouter()
@@ -27,6 +28,7 @@ export function BrandTable() {
   const [brandToDelete, setBrandToDelete] = useState<Brand | null>(null)
   const [page, setPage] = useState(1)
 
+  const { hasPermission } = useAuth()
   const { data: brands, isLoading } = useBrands()
   const deleteMutation = useDeleteBrand()
 
@@ -70,15 +72,16 @@ export function BrandTable() {
             className="pl-9"
           />
         </div>
-        <Button
-          onClick={() => {
-            setSelectedBrand(null)
-            setIsDialogOpen(true)
-          }}
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Add Brand
-        </Button>
+        {hasPermission("brand:create") && (
+          <Button
+            onClick={() => {
+              setSelectedBrand(null)
+              setIsDialogOpen(true)
+            }}
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Add Brand
+          </Button>)}
       </div>
 
       <div className="rounded-md border">
@@ -120,11 +123,11 @@ export function BrandTable() {
                           <Eye className="h-4 w-4 mr-2" />
                           View Details
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleEdit(brand)}>Edit</DropdownMenuItem>
+                        {hasPermission("brand:update") && (<DropdownMenuItem onClick={() => handleEdit(brand)}>Edit</DropdownMenuItem>)}
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={() => handleDelete(brand)} className="text-destructive">
+                        {hasPermission("brand:delete") && (<DropdownMenuItem onClick={() => handleDelete(brand)} className="text-destructive">
                           Delete
-                        </DropdownMenuItem>
+                        </DropdownMenuItem>)}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>

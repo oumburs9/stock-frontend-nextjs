@@ -16,6 +16,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Card } from "@/components/ui/card"
+import { useAuth } from "@/lib/hooks/use-auth"
 
 interface CostingTableProps {
   searchQuery: string
@@ -24,6 +25,7 @@ interface CostingTableProps {
 export function CostingTable({ searchQuery }: CostingTableProps) {
   const [page, setPage] = useState(1)
   const router = useRouter()
+  const { hasPermission } = useAuth()
 
   const { data: costings, isLoading } = useCostings()
   const { data: invoices } = useInvoices()
@@ -45,6 +47,7 @@ export function CostingTable({ searchQuery }: CostingTableProps) {
   }
 
   const handleRecompute = async (invoiceId: string) => {
+    if (!hasPermission("costing:compute")) return
     await computeMutation.mutateAsync(invoiceId)
   }
 
@@ -104,14 +107,14 @@ export function CostingTable({ searchQuery }: CostingTableProps) {
                         <DropdownMenuContent align="end">
                           <DropdownMenuLabel>Actions</DropdownMenuLabel>
                           <DropdownMenuSeparator />
-                          <DropdownMenuItem onClick={() => router.push(`/finance/invoices/${costing.invoice_id}`)}>
+                          {hasPermission("invoice:view") && (<DropdownMenuItem onClick={() => router.push(`/finance/invoices/${costing.invoice_id}`)}>
                             <Eye className="h-4 w-4 mr-2" />
                             View Invoice
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleRecompute(costing.invoice_id)}>
+                          </DropdownMenuItem>)}
+                          {hasPermission("costing:compute") && (<DropdownMenuItem onClick={() => handleRecompute(costing.invoice_id)}>
                             <Calculator className="h-4 w-4 mr-2" />
                             Recompute
-                          </DropdownMenuItem>
+                          </DropdownMenuItem>)}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>

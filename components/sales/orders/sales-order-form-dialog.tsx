@@ -15,6 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast"
 import { SearchableCombobox } from "@/components/shared/searchable-combobox"
 import type { SalesOrder, CreateSalesOrderRequest } from "@/lib/types/sales"
+import { useAuth } from "@/lib/hooks/use-auth"
 
 interface SalesOrderFormDialogProps {
   salesOrder: SalesOrder | null
@@ -30,6 +31,7 @@ export function SalesOrderFormDialog({ salesOrder, open, onOpenChange }: SalesOr
   const { data: warehouses } = useWarehouses()
   const { data: shops } = useShops()
   const [locationType, setLocationType] = useState<"warehouse" | "shop">("warehouse")
+  const { hasPermission } = useAuth()
 
   const {
     register,

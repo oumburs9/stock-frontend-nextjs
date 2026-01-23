@@ -12,6 +12,7 @@ import { ArrowLeft, Plus } from "lucide-react"
 import { usePayable, usePayablePayments } from "@/lib/hooks/use-finance"
 import { usePartners } from "@/lib/hooks/use-partners"
 import { RecordPayablePaymentDialog } from "@/components/finance/payables/record-payable-payment-dialog"
+import { useAuth } from "@/lib/hooks/use-auth"
 
 export default function PayableDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -21,6 +22,7 @@ export default function PayableDetailPage() {
   const { data: payable, isLoading } = usePayable(id)
   const { data: payments } = usePayablePayments(id)
   const { data: partners } = usePartners("supplier")
+  const { hasPermission } = useAuth()
 
   if (isLoading) {
     return (
@@ -140,7 +142,7 @@ export default function PayableDetailPage() {
                 <CardTitle>Payment History</CardTitle>
                 <CardDescription>All payments recorded for this payable</CardDescription>
               </div>
-              {payable.status !== "paid" && (
+              {hasPermission("payable:record-payment") && payable.status !== "paid" && (
                 <Button onClick={() => setShowPaymentDialog(true)}>
                   <Plus className="mr-2 h-4 w-4" />
                   Record Payment

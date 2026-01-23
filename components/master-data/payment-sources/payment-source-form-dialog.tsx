@@ -18,6 +18,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import type { PaymentSource, PaymentSourceType } from "@/lib/types/payment-source"
+import { useAuth } from "@/lib/hooks/use-auth"
 
 interface PaymentSourceFormDialogProps {
   paymentSource: PaymentSource | null
@@ -34,8 +35,14 @@ export function PaymentSourceFormDialog({ paymentSource, open, onOpenChange }: P
   })
   const [showInactiveWarning, setShowInactiveWarning] = useState(false)
 
+  const { hasPermission } = useAuth()
+
   const createMutation = useCreatePaymentSource()
   const updateMutation = useUpdatePaymentSource()
+
+  const canSubmit = paymentSource
+    ? hasPermission("payment-source:update")
+    : hasPermission("payment-source:create")
 
   useEffect(() => {
     if (paymentSource) {
@@ -155,7 +162,7 @@ export function PaymentSourceFormDialog({ paymentSource, open, onOpenChange }: P
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending}>
+            <Button type="submit" disabled={!canSubmit || createMutation.isPending || updateMutation.isPending}>
               {createMutation.isPending || updateMutation.isPending ? "Saving..." : paymentSource ? "Update" : "Create"}
             </Button>
           </DialogFooter>

@@ -20,6 +20,7 @@ import { Card } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { RecordReceivablePaymentDialog } from "./record-receivable-payment-dialog"
 import type { Receivable } from "@/lib/types/finance"
+import { useAuth } from "@/lib/hooks/use-auth"
 
 interface ReceivableTableProps {
   searchQuery: string
@@ -36,6 +37,7 @@ export function ReceivableTable({ searchQuery, statusFilter }: ReceivableTablePr
 
   const { data: receivables, isLoading, error } = useReceivables()
   const { data: customers } = usePartners("customer")
+  const { hasPermission } = useAuth()
 
   const filteredReceivables = receivables?.filter((rec) => {
     const matchesSearch =
@@ -125,7 +127,7 @@ export function ReceivableTable({ searchQuery, statusFilter }: ReceivableTablePr
                             <Eye className="h-4 w-4 mr-2" />
                             View Details
                           </DropdownMenuItem>
-                          {receivable.status !== "paid" && (
+                          {hasPermission("receivable:record-payment") && receivable.status !== "paid" && (
                             <DropdownMenuItem onClick={() => setPaymentDialog({ open: true, receivable })}>
                               <DollarSign className="h-4 w-4 mr-2" />
                               Record Payment

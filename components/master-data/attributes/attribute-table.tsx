@@ -18,6 +18,7 @@ import { AttributeFormDialog } from "./attribute-form-dialog"
 import { ConfirmDeleteDialog } from "@/components/shared/confirm-delete-dialog"
 import type { Attribute } from "@/lib/types/master-data"
 import { Badge } from "@/components/ui/badge"
+import { useAuth } from "@/lib/hooks/use-auth"
 
 export function AttributeTable() {
   const [search, setSearch] = useState("")
@@ -26,6 +27,7 @@ export function AttributeTable() {
   const [attributeToDelete, setAttributeToDelete] = useState<Attribute | null>(null)
   const [page, setPage] = useState(1)
 
+  const { hasPermission } = useAuth()
   const { data: attributes, isLoading } = useAttributes()
   const deleteMutation = useDeleteAttribute()
 
@@ -70,15 +72,16 @@ export function AttributeTable() {
             className="pl-9"
           />
         </div>
-        <Button
-          onClick={() => {
-            setSelectedAttribute(null)
-            setIsDialogOpen(true)
-          }}
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Add Attribute
-        </Button>
+        {hasPermission("attribute:create") && (
+          <Button
+            onClick={() => {
+              setSelectedAttribute(null)
+              setIsDialogOpen(true)
+            }}
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Add Attribute
+          </Button>)}
       </div>
 
       <div className="rounded-md border">
@@ -124,11 +127,11 @@ export function AttributeTable() {
                       <DropdownMenuContent align="end">
                         <DropdownMenuLabel>Actions</DropdownMenuLabel>
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={() => handleEdit(attribute)}>Edit</DropdownMenuItem>
+                        {hasPermission("attribute:update") && (<DropdownMenuItem onClick={() => handleEdit(attribute)}>Edit</DropdownMenuItem>)}
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={() => handleDelete(attribute)} className="text-destructive">
+                        {hasPermission("attribute:delete") && (<DropdownMenuItem onClick={() => handleDelete(attribute)} className="text-destructive">
                           Delete
-                        </DropdownMenuItem>
+                        </DropdownMenuItem>)}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>

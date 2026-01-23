@@ -20,6 +20,7 @@ import type {
   ProductAttributeValue,
   CreateProductAttributeValueRequest,
 } from "@/lib/types/master-data";
+import { useAuth } from "@/lib/hooks/use-auth";
 
 export function ProductAttributeValuesContent({ productId }: { productId: string }) {
   const router = useRouter();
@@ -29,6 +30,7 @@ export function ProductAttributeValuesContent({ productId }: { productId: string
   const [attributeValues, setAttributeValues] = useState<Record<string, any>>({});
   const [hasChanges, setHasChanges] = useState(false);
 
+  const { hasPermission } = useAuth()
   // -----------------------------------------------
   // LOAD FULL PRODUCT FROM BACKEND
   // -----------------------------------------------
@@ -183,6 +185,7 @@ export function ProductAttributeValuesContent({ productId }: { productId: string
             type="text"
             value={value}
             onChange={(e) => handleValueChange(attrId, e.target.value)}
+            disabled={!hasPermission("product-attribute:value:update")}
           />
         );
 
@@ -192,6 +195,7 @@ export function ProductAttributeValuesContent({ productId }: { productId: string
             type="number"
             value={value}
             onChange={(e) => handleValueChange(attrId, e.target.value)}
+            disabled={!hasPermission("product-attribute:value:update")}
           />
         );
 
@@ -201,6 +205,7 @@ export function ProductAttributeValuesContent({ productId }: { productId: string
             type="date"
             value={value}
             onChange={(e) => handleValueChange(attrId, e.target.value)}
+            disabled={!hasPermission("product-attribute:value:update")}
           />
         );
 
@@ -210,6 +215,7 @@ export function ProductAttributeValuesContent({ productId }: { productId: string
             <Checkbox
               checked={value === true || value === "true"}
               onCheckedChange={(checked) => handleValueChange(attrId, checked)}
+              disabled={!hasPermission("product-attribute:value:update")}
             />
             <span>{value ? "Yes" : "No"}</span>
           </div>
@@ -244,21 +250,21 @@ export function ProductAttributeValuesContent({ productId }: { productId: string
         </Button>
 
         <div className="flex gap-2">
-          {hasChanges && (
+          {hasPermission("product-attribute:value:update") && hasChanges && (
             <Button variant="outline" size="sm" onClick={handleReset}>
               <RefreshCw className="h-4 w-4 mr-2" />
               Reset
             </Button>
           )}
 
-          <Button
+          {hasPermission("product-attribute:value:update") && (<Button
             size="sm"
             disabled={!hasChanges || saveMutation.isPending}
             onClick={() => saveMutation.mutate()}
           >
             <Save className="h-4 w-4 mr-2" />
             {saveMutation.isPending ? "Saving..." : "Save"}
-          </Button>
+          </Button>)}
         </div>
       </div>
 

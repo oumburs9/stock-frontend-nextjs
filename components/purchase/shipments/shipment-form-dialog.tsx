@@ -15,6 +15,7 @@ import { useToast } from "@/hooks/use-toast"
 import { Plus, Trash2 } from "lucide-react"
 import { SearchableCombobox } from "@/components/shared/searchable-combobox"
 import type { PurchaseShipment, CreateShipmentRequest } from "@/lib/types/purchase"
+import { useAuth } from "@/lib/hooks/use-auth"
 
 interface ShipmentItemRow {
   po_item_id: string | null
@@ -36,6 +37,7 @@ export function ShipmentFormDialog({ shipment, open, onOpenChange }: ShipmentFor
   const { data: products } = useProducts()
   const { data: purchaseOrders } = usePurchaseOrders({ status: "approved" })
   const { data: suppliers } = usePartners("supplier")
+  const { hasPermission } = useAuth()
 
   const {
     register,
@@ -427,7 +429,16 @@ export function ShipmentFormDialog({ shipment, open, onOpenChange }: ShipmentFor
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending}>
+            <Button 
+              type="submit" 
+              disabled={
+                Boolean(
+                createMutation.isPending || updateMutation.isPending ||
+                (!shipment && !hasPermission("purchase-shipment:create")) ||
+                (shipment !== null && !hasPermission("purchase-shipment:update"))
+                )
+              }
+              >
               {createMutation.isPending || updateMutation.isPending ? "Saving..." : "Save"}
             </Button>
           </DialogFooter>

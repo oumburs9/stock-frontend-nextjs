@@ -1,7 +1,7 @@
 // API Configuration
 export const API_CONFIG = {
   // Change this to your production API URL
-  baseURL: process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api" || "https://api.alifcarimport.com/api",
+  baseURL: process.env.NEXT_PUBLIC_API_URL || "https://api.alifcarimport.com/api",
   timeout: 30000,
   withCredentials: true, // Important: Send cookies with requests
 }

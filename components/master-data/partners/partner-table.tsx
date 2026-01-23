@@ -18,6 +18,7 @@ import { PartnerFormDialog } from "./partner-form-dialog"
 import { ConfirmDeleteDialog } from "@/components/shared/confirm-delete-dialog"
 import type { Partner } from "@/lib/types/master-data"
 import { useRouter } from "next/navigation"
+import { useAuth } from "@/lib/hooks/use-auth"
 
 export function PartnerTable() {
   const [search, setSearch] = useState("")
@@ -27,6 +28,7 @@ export function PartnerTable() {
   const [page, setPage] = useState(1)
   const router = useRouter()
 
+  const { hasPermission } = useAuth()
   const { data: partners, isLoading } = usePartners()
   const deleteMutation = useDeletePartner()
 
@@ -76,15 +78,16 @@ export function PartnerTable() {
             className="pl-9"
           />
         </div>
-        <Button
-          onClick={() => {
-            setSelectedPartner(null)
-            setIsDialogOpen(true)
-          }}
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Add Partner
-        </Button>
+        {hasPermission("partner:create") && (
+          <Button
+            onClick={() => {
+              setSelectedPartner(null)
+              setIsDialogOpen(true)
+            }}
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Add Partner
+          </Button>)}
       </div>
 
       <div className="rounded-md border">
@@ -145,11 +148,11 @@ export function PartnerTable() {
                           <Eye className="h-4 w-4 mr-2" />
                           View Details
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleEdit(partner)}>Edit</DropdownMenuItem>
+                        {hasPermission("partner:update") && (<DropdownMenuItem onClick={() => handleEdit(partner)}>Edit</DropdownMenuItem>)}
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={() => handleDelete(partner)} className="text-destructive">
+                        {hasPermission("partner:delete") && (<DropdownMenuItem onClick={() => handleDelete(partner)} className="text-destructive">
                           Delete
-                        </DropdownMenuItem>
+                        </DropdownMenuItem>)}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>

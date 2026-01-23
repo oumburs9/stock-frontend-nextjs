@@ -18,6 +18,7 @@ import { ShopFormDialog } from "./shop-form-dialog"
 import { ConfirmDeleteDialog } from "@/components/shared/confirm-delete-dialog"
 import type { Shop } from "@/lib/types/inventory"
 import { useRouter } from "next/navigation"
+import { useAuth } from "@/lib/hooks/use-auth"
 
 export function ShopTable() {
   const [search, setSearch] = useState("")
@@ -27,6 +28,7 @@ export function ShopTable() {
   const [page, setPage] = useState(1)
   const router = useRouter()
 
+  const { hasPermission } = useAuth()
   const { data: shops, isLoading } = useShops()
   const deleteMutation = useDeleteShop()
 
@@ -74,15 +76,16 @@ export function ShopTable() {
             className="pl-9"
           />
         </div>
-        <Button
-          onClick={() => {
-            setSelectedShop(null)
-            setIsDialogOpen(true)
-          }}
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Add Shop
-        </Button>
+        {hasPermission("shop:create") && (
+          <Button
+            onClick={() => {
+              setSelectedShop(null)
+              setIsDialogOpen(true)
+            }}
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Add Shop
+          </Button>)}
       </div>
 
       <div className="rounded-md border">
@@ -128,12 +131,12 @@ export function ShopTable() {
                       <DropdownMenuContent align="end">
                         <DropdownMenuLabel>Actions</DropdownMenuLabel>
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={() => handleEdit(shop)}>Edit</DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleViewDetails(shop.id)}>View Details</DropdownMenuItem>
+                        {hasPermission("shop:update") && (<DropdownMenuItem onClick={() => handleEdit(shop)}>Edit</DropdownMenuItem>)}
+                        {hasPermission("shop:view") && (<DropdownMenuItem onClick={() => handleViewDetails(shop.id)}>View Details</DropdownMenuItem>)}
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={() => handleDelete(shop)} className="text-destructive">
+                        {hasPermission("shop:delete") && (<DropdownMenuItem onClick={() => handleDelete(shop)} className="text-destructive">
                           Delete
-                        </DropdownMenuItem>
+                        </DropdownMenuItem>)}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>

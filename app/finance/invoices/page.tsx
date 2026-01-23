@@ -10,48 +10,55 @@ import { Input } from "@/components/ui/input"
 import { Plus, Search } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { useRouter } from "next/navigation"
+import { RequirePermission } from "@/components/auth/require-permission"
+import { useAuth } from "@/lib/hooks/use-auth"
 
 export default function InvoicesPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [isIssueDialogOpen, setIsIssueDialogOpen] = useState(false)
   const router = useRouter()
+  const { hasPermission } = useAuth()
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
-        <PageHeader
-          title="Customer Invoices"
-          description="Manage customer invoices and billing"
-          action={
-            <Button onClick={() => setIsIssueDialogOpen(true)}>
-              <Plus className="mr-2 h-4 w-4" />
-              Issue Invoice
-            </Button>
-          }
-        />
+      <RequirePermission permission="invoice:view">
+        <div className="space-y-6">
+          <PageHeader
+            title="Customer Invoices"
+            description="Manage customer invoices and billing"
+            action={
+               hasPermission("invoice:issue") && (
+                <Button onClick={() => setIsIssueDialogOpen(true)}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Issue Invoice
+                </Button>
+                )
+            }
+          />
 
-        <Card>
-          <CardContent className="pt-6">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search by invoice number or customer..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-          </CardContent>
-        </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search by invoice number or customer..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+            </CardContent>
+          </Card>
 
-        <InvoiceTable searchQuery={searchQuery} />
+          <InvoiceTable searchQuery={searchQuery} />
 
-        <IssueInvoiceDialog
-          open={isIssueDialogOpen}
-          onOpenChange={setIsIssueDialogOpen}
-          onSuccess={(invoiceId) => router.push(`/finance/invoices/${invoiceId}`)}
-        />
-      </div>
+          <IssueInvoiceDialog
+            open={isIssueDialogOpen}
+            onOpenChange={setIsIssueDialogOpen}
+            onSuccess={(invoiceId) => router.push(`/finance/invoices/${invoiceId}`)}
+          />
+        </div>
+      </RequirePermission>
     </DashboardLayout>
   )
 }

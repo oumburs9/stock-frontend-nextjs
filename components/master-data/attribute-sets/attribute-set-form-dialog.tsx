@@ -16,6 +16,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import type { AttributeSet } from "@/lib/types/master-data"
+import { useAuth } from "@/lib/hooks/use-auth"
 
 interface AttributeSetFormDialogProps {
   set: AttributeSet | null
@@ -28,6 +29,8 @@ export function AttributeSetFormDialog({ set, open, onOpenChange }: AttributeSet
 
   const createMutation = useCreateAttributeSet()
   const updateMutation = useUpdateAttributeSet()
+
+  const { hasPermission } = useAuth()
 
   useEffect(() => {
     if (set) {
@@ -57,6 +60,10 @@ export function AttributeSetFormDialog({ set, open, onOpenChange }: AttributeSet
     }
   }
 
+  const canSubmit = set
+    ? hasPermission("attribute-set:update")
+    : hasPermission("attribute-set:create")
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
@@ -73,7 +80,7 @@ export function AttributeSetFormDialog({ set, open, onOpenChange }: AttributeSet
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending}>
+            <Button type="submit" disabled={!canSubmit ||createMutation.isPending || updateMutation.isPending}>
               {createMutation.isPending || updateMutation.isPending ? "Saving..." : set ? "Update" : "Create"}
             </Button>
           </DialogFooter>

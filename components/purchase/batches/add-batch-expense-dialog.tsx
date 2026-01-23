@@ -11,6 +11,7 @@ import { SearchableCombobox } from "@/components/shared/searchable-combobox"
 import { useToast } from "@/hooks/use-toast"
 import type { AddBatchExpenseRequest } from "@/lib/types/purchase"
 import { useMemo } from "react"
+import { useAuth } from "@/lib/hooks/use-auth"
 
 interface AddBatchExpenseDialogProps {
   batchId: string
@@ -22,6 +23,7 @@ export function AddBatchExpenseDialog({ batchId, open, onOpenChange }: AddBatchE
   const { toast } = useToast()
   const addExpenseMutation = useAddBatchExpense()
 
+  const { hasPermission } = useAuth()
   const { data: expenseTypes } = useExpenseTypes({ scope: "batch" })
 
   const {
@@ -115,7 +117,7 @@ export function AddBatchExpenseDialog({ batchId, open, onOpenChange }: AddBatchE
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={addExpenseMutation.isPending}>
+            <Button type="submit" disabled={addExpenseMutation.isPending || !hasPermission("product-batch-expense:add")}>
               {addExpenseMutation.isPending ? "Adding..." : "Add Expense"}
             </Button>
           </DialogFooter>

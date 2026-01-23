@@ -19,6 +19,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { SearchableSelect } from "@/components/shared/searchable-select"
+import { useAuth } from "@/lib/hooks/use-auth"
 
 interface StockReservationFormDialogProps {
   open: boolean
@@ -35,6 +36,7 @@ export function StockReservationFormDialog({ open, onOpenChange }: StockReservat
   })
   const [selectedProduct, setSelectedProduct] = useState<{ id: string; available: number } | null>(null)
 
+  const { hasPermission } = useAuth()
   const { data: warehouses } = useWarehouses()
   const { data: shops } = useShops()
   const { data: stockAtLocation } = useStockByLocation(formData.locationType, formData.locationId)
@@ -228,6 +230,7 @@ export function StockReservationFormDialog({ open, onOpenChange }: StockReservat
             <Button
               type="submit"
               disabled={
+                !hasPermission("stock.reservation:create") ||
                 createMutation.isPending || !formData.locationId || !formData.productId || !formData.salesOrderId
               }
             >

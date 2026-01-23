@@ -39,6 +39,8 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu"
+import { useAuth } from "@/lib/hooks/use-auth"
+import { RequirePermission } from "@/components/auth/require-permission"
 
 export default function SalesOrderDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -51,6 +53,7 @@ export default function SalesOrderDetailPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [deleteItemId, setDeleteItemId] = useState<string | null>(null)
 
+  const { hasPermission } = useAuth()
   const { data: order } = useSalesOrder(id)
   const { data: customers = [] } = usePartners("customer")
   const { data: products = [] } = useProducts()
@@ -207,6 +210,7 @@ export default function SalesOrderDetailPage() {
 
   return (
     <DashboardLayout>
+      <RequirePermission permission="sales-order:view">
       <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -222,19 +226,19 @@ export default function SalesOrderDetailPage() {
           </div>
           <div className="flex items-center gap-2">
             {getStatusBadge(order.status)}
-            {canConfirm && (
+            {canConfirm && hasPermission('sales-order:confirm') && (
               <Button onClick={() => setConfirmAction("confirm")}>
                 <CheckCircle className="h-4 w-4 mr-2" />
                 Confirm
               </Button>
             )}
-            {canDeliver && (
+            {canDeliver && hasPermission('sales-order:deliver') && (
               <Button onClick={() => setConfirmAction("deliver")}>
                 <Truck className="h-4 w-4 mr-2" />
                 Deliver
               </Button>
             )}
-            {canCancel && (
+            {canCancel && hasPermission('sales-order:cancel') && (
               <Button variant="destructive" onClick={() => setConfirmAction("cancel")}>
                 <XCircle className="h-4 w-4 mr-2" />
                 Cancel
@@ -311,7 +315,7 @@ export default function SalesOrderDetailPage() {
                     className="pl-8"
                   />
                 </div>
-                {canAddItems && (
+                {canAddItems && hasPermission('sales-order-item:add') &&  (
                   <Button size="sm" onClick={() => setShowAddItemDialog(true)}>
                     <Plus className="h-4 w-4 mr-1" />
                     Add Item
@@ -393,7 +397,7 @@ export default function SalesOrderDetailPage() {
                           <TableCell className="text-right font-medium">
                             {formatCurrency(Number.parseFloat(item.total_price))}
                           </TableCell>
-                          {canEditItems && (
+                          {canEditItems && hasPermission('sales-order-item:update') && (
                             <TableCell className="text-center">
                               <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
@@ -411,7 +415,7 @@ export default function SalesOrderDetailPage() {
                                     <Pencil className="h-4 w-4 mr-2" />
                                     Edit Item
                                   </DropdownMenuItem>
-                                  {canDeleteItems && (
+                                  {canDeleteItems && hasPermission('sales-order-item:delete') && (
                                     <>
                                       <DropdownMenuSeparator />
                                       <DropdownMenuItem
@@ -531,6 +535,7 @@ export default function SalesOrderDetailPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      </RequirePermission>
     </DashboardLayout>
   )
 }

@@ -31,6 +31,7 @@ import {
 import { useRouter } from "next/navigation"
 import { useShipments, useCloseShipment } from "@/lib/hooks/use-shipments"
 import { usePartners } from "@/lib/hooks/use-partners"
+import { useAuth } from "@/lib/hooks/use-auth"
 
 const DEMO_SUPPLIER_NAMES: Record<string, string> = {
   "1": "ABC Electronics Corp",
@@ -50,6 +51,7 @@ export function ShipmentTable() {
   const [page, setPage] = useState(1)
   const [selectedForAction, setSelectedForAction] = useState<any>(null)
   const router = useRouter()
+  const { hasPermission } = useAuth()
   const { toast } = useToast()
    const { data: suppliers } = usePartners("supplier")
 
@@ -145,15 +147,16 @@ export function ShipmentTable() {
             className="pl-9"
           />
         </div>
-        <Button
-          onClick={() => {
-            setSelectedShipment(null)
-            setIsDialogOpen(true)
-          }}
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          New Shipment
-        </Button>
+        {hasPermission("purchase-shipment:create") && (
+          <Button
+            onClick={() => {
+              setSelectedShipment(null)
+              setIsDialogOpen(true)
+            }}
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            New Shipment
+          </Button>)}
       </div>
 
       <div className="flex gap-2 flex-wrap items-center">
@@ -242,23 +245,23 @@ export function ShipmentTable() {
                           <Eye className="h-4 w-4 mr-2" />
                           View Details
                         </DropdownMenuItem>
-                        {shipment.status === "draft" && (
+                        {shipment.status === "draft" && hasPermission("purchase-shipment:update") && (
                           <DropdownMenuItem onClick={() => handleEdit(shipment)}>
                             <Edit className="h-4 w-4 mr-2" />
                             Edit
                           </DropdownMenuItem>
                         )}
-                        <DropdownMenuItem onClick={() => handleAddExpense(shipment)}>
+                        {hasPermission("purchase-shipment-expense:add") && (<DropdownMenuItem onClick={() => handleAddExpense(shipment)}>
                           <FileText className="h-4 w-4 mr-2" />
                           Add Expense
-                        </DropdownMenuItem>
-                        {(shipment.status === "draft" || shipment.status === "partially_received") && (
+                        </DropdownMenuItem>)}
+                        {(shipment.status === "draft" || shipment.status === "partially_received") && hasPermission("purchase-shipment:receive") && (
                           <DropdownMenuItem onClick={() => handleReceive(shipment)}>
                             <PackageCheck className="h-4 w-4 mr-2" />
                             Receive
                           </DropdownMenuItem>
                         )}
-                        {shipment.status === "received" && (
+                        {shipment.status === "received" && hasPermission("purchase-shipment:close") && (
                           <>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem onClick={() => handleClose(shipment)} className="text-destructive">
@@ -344,6 +347,7 @@ export function ShipmentTable() {
             <AlertDialogCancel onClick={() => setSelectedForAction(null)}>No, Keep Open</AlertDialogCancel>
             <AlertDialogAction
               onClick={confirmClose}
+              disabled={!hasPermission("purchase-shipment:close")}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               Yes, Close Shipment

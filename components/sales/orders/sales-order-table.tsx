@@ -29,6 +29,7 @@ import { Card } from "@/components/ui/card"
 import { useToast } from "@/hooks/use-toast"
 import { useRouter } from "next/navigation"
 import type { SalesOrder } from "@/lib/types/sales"
+import { useAuth } from "@/lib/hooks/use-auth"
 
 interface SalesOrderTableProps {
   searchQuery: string
@@ -40,6 +41,7 @@ export function SalesOrderTable({ searchQuery, statusFilter }: SalesOrderTablePr
   const [page, setPage] = useState(1)
   const { toast } = useToast()
   const router = useRouter()
+  const { hasPermission } = useAuth()
 
   const { data: orders, isLoading } = useSalesOrders({
     q: searchQuery || undefined,
@@ -176,19 +178,21 @@ export function SalesOrderTable({ searchQuery, statusFilter }: SalesOrderTablePr
                             <Eye className="h-4 w-4 mr-2" />
                             View Details
                           </DropdownMenuItem>
-                          {order.status === "draft" && (
+                          {order.status === "draft" && hasPermission('sales-order:confirm') && (
                             <DropdownMenuItem onClick={() => setConfirmAction({ type: "confirm", order })}>
                               <CheckCircle className="h-4 w-4 mr-2" />
                               Confirm
                             </DropdownMenuItem>
                           )}
-                          {(order.status === "confirmed" || order.status === "reserved") && (
+                          {(order.status === "confirmed" || order.status === "reserved") &&
+                            hasPermission('sales-order:deliver') && (
                             <DropdownMenuItem onClick={() => setConfirmAction({ type: "deliver", order })}>
                               <Truck className="h-4 w-4 mr-2" />
                               Deliver
                             </DropdownMenuItem>
                           )}
-                          {order.status !== "delivered" && order.status !== "cancelled" && (
+                          {order.status !== "delivered" && order.status !== "cancelled" &&
+                            hasPermission('sales-order:cancel') && (
                             <>
                               <DropdownMenuSeparator />
                               <DropdownMenuItem

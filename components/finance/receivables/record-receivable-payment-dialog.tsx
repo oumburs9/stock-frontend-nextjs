@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import type { Receivable, CreateReceivablePaymentRequest } from "@/lib/types/finance"
+import { useAuth } from "@/lib/hooks/use-auth"
 
 interface RecordReceivablePaymentDialogProps {
   open: boolean
@@ -20,6 +21,7 @@ interface RecordReceivablePaymentDialogProps {
 export function RecordReceivablePaymentDialog({ open, receivable, onOpenChange }: RecordReceivablePaymentDialogProps) {
   const createMutation = useCreateReceivablePayment()
   const { data: paymentSources = [] } = usePaymentSources()
+  const { hasPermission } = useAuth()
 
   const {
     register,
@@ -53,6 +55,8 @@ export function RecordReceivablePaymentDialog({ open, receivable, onOpenChange }
   }, [receivable, open, reset])
 
   const onSubmit = async (data: CreateReceivablePaymentRequest) => {
+    if (!hasPermission('receivable:record-payment')) return null
+
     const submitData = {
       ...data,
       paymentSourceId: data.paymentSourceId === "none" ? null : data.paymentSourceId,
@@ -145,7 +149,7 @@ export function RecordReceivablePaymentDialog({ open, receivable, onOpenChange }
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={createMutation.isPending}>
+            <Button type="submit" disabled={createMutation.isPending || !hasPermission("receivable:record-payment")}>
               {createMutation.isPending ? "Recording..." : "Record Payment"}
             </Button>
           </DialogFooter>

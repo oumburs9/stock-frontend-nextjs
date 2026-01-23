@@ -12,6 +12,7 @@ import { Loader2, DollarSign, Eye, MoreHorizontal, ChevronLeft, ChevronRight } f
 import { AddBatchExpenseDialog } from "./add-batch-expense-dialog"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { useRouter } from "next/navigation"
+import { useAuth } from "@/lib/hooks/use-auth"
 
 interface BatchTableProps {
   globalSearch: string
@@ -26,6 +27,7 @@ export function BatchTable({ globalSearch, productFilter, shipmentFilter, poFilt
   const [isExpenseDialogOpen, setIsExpenseDialogOpen] = useState(false)
   const [page, setPage] = useState(1)
 
+  const { hasPermission } = useAuth()
   const { data: batches, isLoading: batchesLoading } = useBatches()
   const { data: products, isLoading: productsLoading } = useProducts()
   const { data: shipments } = useShipments()
@@ -198,10 +200,10 @@ export function BatchTable({ globalSearch, productFilter, shipmentFilter, poFilt
                               <Eye className="mr-2 h-4 w-4" />
                               View Details
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleAddExpense(batch.id)}>
+                            {hasPermission("product-batch-expense:add") && (<DropdownMenuItem onClick={() => handleAddExpense(batch.id)}>
                               <DollarSign className="mr-2 h-4 w-4" />
                               Add Expense
-                            </DropdownMenuItem>
+                            </DropdownMenuItem>)}
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>

@@ -18,6 +18,7 @@ import { Badge } from "@/components/ui/badge"
 import { PaymentSourceFormDialog } from "./payment-source-form-dialog"
 import { ConfirmDeleteDialog } from "@/components/shared/confirm-delete-dialog"
 import type { PaymentSource } from "@/lib/types/payment-source"
+import { useAuth } from "@/lib/hooks/use-auth"
 
 export function PaymentSourceTable() {
   const [search, setSearch] = useState("")
@@ -25,6 +26,7 @@ export function PaymentSourceTable() {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [sourceToDelete, setSourceToDelete] = useState<PaymentSource | null>(null)
 
+  const { hasPermission } = useAuth()
   const { data: sources, isLoading } = usePaymentSources()
   const deleteMutation = useDeletePaymentSource()
 
@@ -74,15 +76,16 @@ export function PaymentSourceTable() {
             className="pl-9"
           />
         </div>
-        <Button
-          onClick={() => {
-            setSelectedSource(null)
-            setIsDialogOpen(true)
-          }}
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Add Payment Source
-        </Button>
+        {hasPermission("payment-source:create") && (
+          <Button
+            onClick={() => {
+              setSelectedSource(null)
+              setIsDialogOpen(true)
+            }}
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Add Payment Source
+          </Button>)}
       </div>
 
       <div className="rounded-md border">
@@ -136,15 +139,15 @@ export function PaymentSourceTable() {
                       <DropdownMenuContent align="end">
                         <DropdownMenuLabel>Actions</DropdownMenuLabel>
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={() => handleEdit(source)}>
+                        {hasPermission("payment-source:update") && (<DropdownMenuItem onClick={() => handleEdit(source)}>
                           <Pencil className="h-4 w-4 mr-2" />
                           Edit
-                        </DropdownMenuItem>
+                        </DropdownMenuItem>)}
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={() => handleDelete(source)} className="text-destructive">
+                        {hasPermission("payment-source:delete") && (<DropdownMenuItem onClick={() => handleDelete(source)} className="text-destructive">
                           <Trash2 className="h-4 w-4 mr-2" />
                           Delete
-                        </DropdownMenuItem>
+                        </DropdownMenuItem>)}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>

@@ -11,6 +11,7 @@ import { useToast } from "@/hooks/use-toast"
 import type { BatchExpense } from "@/lib/types/purchase"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { InfoIcon } from "lucide-react"
+import { useAuth } from "@/lib/hooks/use-auth"
 
 interface AdjustBatchExpenseDialogProps {
   expense: BatchExpense
@@ -26,6 +27,7 @@ export function AdjustBatchExpenseDialog({
   onOpenChange,
 }: AdjustBatchExpenseDialogProps) {
   const { toast } = useToast()
+  const { hasPermission } = useAuth()
   const adjustMutation = useAddBatchExpenseAdjustment()
 
   const {
@@ -131,7 +133,7 @@ export function AdjustBatchExpenseDialog({
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={adjustMutation.isPending || !hasRemainingQuantity}>
+            <Button type="submit" disabled={adjustMutation.isPending || !hasRemainingQuantity || !hasPermission("product-batch-expense:adjust")}>
               {adjustMutation.isPending ? "Adjusting..." : "Add Adjustment"}
             </Button>
           </DialogFooter>

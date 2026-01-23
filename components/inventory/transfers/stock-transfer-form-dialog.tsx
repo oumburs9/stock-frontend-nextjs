@@ -20,6 +20,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { SearchableSelect } from "@/components/shared/searchable-select"
+import { useAuth } from "@/lib/hooks/use-auth"
 
 interface StockTransferFormDialogProps {
   open: boolean
@@ -37,6 +38,7 @@ export function StockTransferFormDialog({ open, onOpenChange }: StockTransferFor
     reason: "",
   })
 
+  const { hasPermission } = useAuth()
   const { data: products } = useProducts()
   const { data: warehouses } = useWarehouses()
   const { data: shops } = useShops()
@@ -208,7 +210,7 @@ export function StockTransferFormDialog({ open, onOpenChange }: StockTransferFor
             </Button>
             <Button
               type="submit"
-              disabled={createMutation.isPending || !formData.fromLocationId || !formData.productId}
+              disabled={!hasPermission("stock.transfer:create") || createMutation.isPending || !formData.fromLocationId || !formData.productId}
             >
               {createMutation.isPending ? "Creating..." : "Create Transfer"}
             </Button>

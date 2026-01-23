@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/dialog"
 import { Card, CardContent } from "@/components/ui/card"
 import type { StockTransfer } from "@/lib/types/inventory"
+import { useAuth } from "@/lib/hooks/use-auth"
 
 export function StockTransferTable() {
   const [search, setSearch] = useState("")
@@ -32,6 +33,7 @@ export function StockTransferTable() {
   const [page, setPage] = useState(1)
   const [selectedTransfer, setSelectedTransfer] = useState<StockTransfer | null>(null)
 
+  const { hasPermission } = useAuth()
   const { data: transfers, isLoading } = useStockTransfers()
 
   const filteredTransfers = transfers?.filter(
@@ -60,14 +62,15 @@ export function StockTransferTable() {
             className="pl-9"
           />
         </div>
-        <Button
-          onClick={() => {
-            setIsDialogOpen(true)
-          }}
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          New Transfer
-        </Button>
+        {hasPermission("stock.transfer:create") && (
+          <Button
+            onClick={() => {
+              setIsDialogOpen(true)
+            }}
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            New Transfer
+          </Button>)}
       </div>
 
       <div className="rounded-md border">

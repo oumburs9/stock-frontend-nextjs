@@ -16,6 +16,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import type { Warehouse } from "@/lib/types/inventory"
+import { useAuth } from "@/lib/hooks/use-auth"
 
 interface WarehouseFormDialogProps {
   warehouse: Warehouse | null
@@ -29,9 +30,14 @@ export function WarehouseFormDialog({ warehouse, open, onOpenChange }: Warehouse
     address: "",
     description: "",
   })
+  const { hasPermission } = useAuth()
 
   const createMutation = useCreateWarehouse()
   const updateMutation = useUpdateWarehouse()
+
+  const canSubmit = warehouse
+    ? hasPermission("warehouse:update")
+    : hasPermission("warehouse:create")
 
   useEffect(() => {
     if (warehouse) {
@@ -121,7 +127,7 @@ export function WarehouseFormDialog({ warehouse, open, onOpenChange }: Warehouse
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending}>
+            <Button type="submit" disabled={!canSubmit || createMutation.isPending || updateMutation.isPending}>
               {createMutation.isPending || updateMutation.isPending ? "Saving..." : warehouse ? "Update" : "Create"}
             </Button>
           </DialogFooter>

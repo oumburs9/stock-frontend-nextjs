@@ -20,6 +20,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { SearchableSelect } from "@/components/shared/searchable-select"
+import { useAuth } from "@/lib/hooks/use-auth"
 
 interface StockAdjustmentFormDialogProps {
   open: boolean
@@ -36,6 +37,7 @@ export function StockAdjustmentFormDialog({ open, onOpenChange }: StockAdjustmen
     reason: "",
   })
 
+  const { hasPermission }  = useAuth()
   const { data: products } = useProducts()
   const { data: warehouses } = useWarehouses()
   const { data: shops } = useShops()
@@ -190,7 +192,7 @@ export function StockAdjustmentFormDialog({ open, onOpenChange }: StockAdjustmen
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={createMutation.isPending || !formData.locationId || !formData.productId}>
+            <Button type="submit" disabled={!hasPermission("stock.adjustment:create") || createMutation.isPending || !formData.locationId || !formData.productId}>
               {createMutation.isPending ? "Creating..." : "Create Adjustment"}
             </Button>
           </DialogFooter>

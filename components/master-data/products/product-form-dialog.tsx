@@ -30,6 +30,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { SearchableSelect } from "@/components/shared/searchable-select";
 
 import type { Product } from "@/lib/types/master-data";
+import { useAuth } from "@/lib/hooks/use-auth";
 
 interface ProductFormDialogProps {
   product: Product | null;
@@ -53,6 +54,7 @@ export function ProductFormDialog({ product, open, onOpenChange }: ProductFormDi
 
   const [attributeValues, setAttributeValues] = useState<Record<string, any>>({});
 
+  const { hasPermission } = useAuth()
   // ------------------------------------------------------
   // FETCH BASE DATA
   // ------------------------------------------------------
@@ -68,6 +70,11 @@ export function ProductFormDialog({ product, open, onOpenChange }: ProductFormDi
     queryFn: () => (product ? productService.getProductFull(product.id) : null),
     enabled: !!product?.id && open,
   });
+
+  const canSubmit = product
+    ? hasPermission("product:update")
+    : hasPermission("product:create");
+  const canEditAttributeValues = hasPermission("product-attribute:value:update");
 
   const effectiveProduct = fullProduct ?? product;
 
@@ -344,6 +351,7 @@ export function ProductFormDialog({ product, open, onOpenChange }: ProductFormDi
                               [item.attribute_id]: e.target.value,
                             })
                           }
+                          disabled={!canEditAttributeValues}
                         />
                       )}
 
@@ -357,6 +365,7 @@ export function ProductFormDialog({ product, open, onOpenChange }: ProductFormDi
                               [item.attribute_id]: e.target.value,
                             })
                           }
+                          disabled={!canEditAttributeValues}
                         />
                       )}
 
@@ -370,6 +379,7 @@ export function ProductFormDialog({ product, open, onOpenChange }: ProductFormDi
                               [item.attribute_id]: e.target.value,
                             })
                           }
+                          disabled={!canEditAttributeValues}
                         />
                       )}
 
@@ -383,6 +393,7 @@ export function ProductFormDialog({ product, open, onOpenChange }: ProductFormDi
                                 [item.attribute_id]: checked,
                               })
                             }
+                            disabled={!canEditAttributeValues}
                           />
                           <span>{value ? "Yes" : "No"}</span>
                         </div>
@@ -408,7 +419,7 @@ export function ProductFormDialog({ product, open, onOpenChange }: ProductFormDi
 
             <Button
               type="submit"
-              disabled={createMutation.isPending || updateMutation.isPending}
+              disabled={!canSubmit || createMutation.isPending || updateMutation.isPending}
             >
               {createMutation.isPending || updateMutation.isPending
                 ? "Saving..."

@@ -21,6 +21,7 @@ import { ProductFormDialog } from "./product-form-dialog"
 import { ConfirmDeleteDialog } from "@/components/shared/confirm-delete-dialog"
 import { useRouter } from "next/navigation"
 import type { Product } from "@/lib/types/master-data"
+import { useAuth } from "@/lib/hooks/use-auth"
 
 export function ProductTable() {
   const [search, setSearch] = useState("")
@@ -33,6 +34,7 @@ export function ProductTable() {
   const [productToDelete, setProductToDelete] = useState<Product | null>(null)
   const router = useRouter()
 
+  const { hasPermission } =  useAuth()
   const { data: products, isLoading } = useProducts({
     search,
     category_id: categoryFilter,
@@ -84,15 +86,16 @@ export function ProductTable() {
             className="pl-9"
           />
         </div>
-        <Button
-          onClick={() => {
-            setSelectedProduct(null)
-            setIsDialogOpen(true)
-          }}
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Add Product
-        </Button>
+        {hasPermission("product:create") && (
+          <Button
+            onClick={() => {
+              setSelectedProduct(null)
+              setIsDialogOpen(true)
+            }}
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Add Product
+          </Button>)}
       </div>
 
       <div className="flex gap-2 flex-wrap items-center">
@@ -207,15 +210,15 @@ export function ProductTable() {
                       <DropdownMenuContent align="end">
                         <DropdownMenuLabel>Actions</DropdownMenuLabel>
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={() => handleViewDetails(product.id)}>
+                        {hasPermission("product:view") && (<DropdownMenuItem onClick={() => handleViewDetails(product.id)}>
                           <Eye className="h-4 w-4 mr-2" />
                           View Details
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleEdit(product)}>Edit</DropdownMenuItem>
+                        </DropdownMenuItem>)}
+                        {hasPermission("product:update") && (<DropdownMenuItem onClick={() => handleEdit(product)}>Edit</DropdownMenuItem>)}
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={() => handleDelete(product)} className="text-destructive">
+                        {hasPermission("product:delete") && (<DropdownMenuItem onClick={() => handleDelete(product)} className="text-destructive">
                           Delete
-                        </DropdownMenuItem>
+                        </DropdownMenuItem>)}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>

@@ -25,6 +25,7 @@ import { usePurchaseOrder, useApprovePurchaseOrder, useCancelPurchaseOrder } fro
 import { useBatches } from "@/lib/hooks/use-batches"
 import { usePartners } from "@/lib/hooks/use-partners"
 import { useProducts } from "@/lib/hooks/use-products"
+import { useAuth } from "@/lib/hooks/use-auth"
 
 
 export default function PurchaseOrderDetailPage() {
@@ -40,6 +41,7 @@ export default function PurchaseOrderDetailPage() {
   console.log("poData: ", poData)
   const { data: suppliersData = [] } = usePartners("supplier")
   const { data: productsData = [] } = useProducts()
+  const { hasPermission } = useAuth()
 
 
   const approveMutation = useApprovePurchaseOrder()
@@ -168,19 +170,19 @@ export default function PurchaseOrderDetailPage() {
           </div>
           <div className="flex items-center gap-2">
             {getStatusBadge(po.status)}
-            {canApprove && (
+            {canApprove && hasPermission("purchase-order:approve") && (
               <Button onClick={handleApprove} disabled={approveMutation.isPending}>
                 <CheckCircle className="h-4 w-4 mr-2" />
                 Approve
               </Button>
             )}
-            {canReceive && (
+            {canReceive && hasPermission("purchase-order:receive") && (
               <Button onClick={() => setShowReceiveDialog(true)}>
                 <PackageCheck className="h-4 w-4 mr-2" />
                 Receive
               </Button>
             )}
-            {canCancel && (
+            {canCancel && hasPermission("purchase-order:cancel") && (
               <Button
                 variant="destructive"
                 onClick={() => setShowCancelConfirm(true)}
@@ -290,7 +292,7 @@ export default function PurchaseOrderDetailPage() {
                           <TableCell className="text-right font-medium">
                             {Number.parseFloat(item.total_price).toFixed(2)}
                           </TableCell>
-                          {canReceive && (
+                          {canReceive && hasPermission("purchase-order:receive") && (
                             <TableCell className="text-center">
                               <Button
                                 size="sm"

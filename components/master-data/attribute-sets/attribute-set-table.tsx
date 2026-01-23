@@ -18,6 +18,7 @@ import {
 import { AttributeSetFormDialog } from "./attribute-set-form-dialog"
 import { ConfirmDeleteDialog } from "@/components/shared/confirm-delete-dialog"
 import type { AttributeSet } from "@/lib/types/master-data"
+import { useAuth } from "@/lib/hooks/use-auth"
 
 export function AttributeSetTable() {
   const router = useRouter()
@@ -26,6 +27,7 @@ export function AttributeSetTable() {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [setToDelete, setSetToDelete] = useState<AttributeSet | null>(null)
 
+  const { hasPermission } = useAuth()
   const { data: sets, isLoading } = useAttributeSets()
   const deleteMutation = useDeleteAttributeSet()
 
@@ -63,15 +65,16 @@ export function AttributeSetTable() {
             className="pl-9"
           />
         </div>
-        <Button
-          onClick={() => {
-            setSelectedSet(null)
-            setIsDialogOpen(true)
-          }}
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Add Attribute Set
-        </Button>
+        {hasPermission("attribute-set:create") && (
+          <Button
+            onClick={() => {
+              setSelectedSet(null)
+              setIsDialogOpen(true)
+            }}
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Add Attribute Set
+          </Button>)}
       </div>
 
       <div className="rounded-md border">
@@ -113,15 +116,15 @@ export function AttributeSetTable() {
                       <DropdownMenuContent align="end">
                         <DropdownMenuLabel>Actions</DropdownMenuLabel>
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={() => handleManageAttributes(set.id)}>
+                        {hasPermission("attribute-set:view") && (<DropdownMenuItem onClick={() => handleManageAttributes(set.id)}>
                           <Settings className="h-4 w-4 mr-2" />
                           Manage Attributes
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleEdit(set)}>Edit Name</DropdownMenuItem>
+                        </DropdownMenuItem>)}
+                        {hasPermission("attribute-set:update") && (<DropdownMenuItem onClick={() => handleEdit(set)}>Edit Name</DropdownMenuItem>)}
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={() => handleDelete(set)} className="text-destructive">
+                        {hasPermission("attribute-set:delete") && (<DropdownMenuItem onClick={() => handleDelete(set)} className="text-destructive">
                           Delete
-                        </DropdownMenuItem>
+                        </DropdownMenuItem>)}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>
