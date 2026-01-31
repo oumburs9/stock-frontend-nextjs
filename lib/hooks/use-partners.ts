@@ -1,8 +1,9 @@
 "use client"
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import type { AxiosError } from "axios"
 import { partnerService } from "@/lib/services/partner.service"
-import type { CreatePartnerRequest, UpdatePartnerRequest } from "@/lib/types/master-data"
+import type { CreatePartnerRequest, Partner, UpdatePartnerRequest } from "@/lib/types/master-data"
 
 export function usePartners(type?: "supplier" | "customer") {
   return useQuery({
@@ -31,8 +32,8 @@ export function usePartner(id: string | null) {
 export function useCreatePartner() {
   const queryClient = useQueryClient()
 
-  return useMutation({
-    mutationFn: (data: CreatePartnerRequest) => partnerService.createPartner(data),
+  return useMutation<Partner, AxiosError, CreatePartnerRequest>({
+    mutationFn: (data) => partnerService.createPartner(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["partners"] })
     },
@@ -42,8 +43,8 @@ export function useCreatePartner() {
 export function useUpdatePartner() {
   const queryClient = useQueryClient()
 
-  return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: UpdatePartnerRequest }) => partnerService.updatePartner(id, data),
+  return useMutation<void, AxiosError, { id: string; data: UpdatePartnerRequest }>({
+    mutationFn: ({ id, data }) => partnerService.updatePartner(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["partners"] })
     },
@@ -53,8 +54,8 @@ export function useUpdatePartner() {
 export function useDeletePartner() {
   const queryClient = useQueryClient()
 
-  return useMutation({
-    mutationFn: (id: string) => partnerService.deletePartner(id),
+  return useMutation<void, AxiosError, string>({
+    mutationFn: (id) => partnerService.deletePartner(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["partners"] })
     },

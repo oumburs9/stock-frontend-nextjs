@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import type { AxiosError } from "axios"
 import { ArrowLeft, Plus, Search, MoreHorizontal, Check } from "lucide-react"
 import { useRouter } from "next/navigation"
 import {
@@ -11,6 +12,9 @@ import {
   useRemoveSetItem,
 } from "@/lib/hooks/use-attribute-sets"
 import { useAttributes } from "@/lib/hooks/use-attributes"
+import { parseApiError } from "@/lib/api/parse-api-error"
+import { showApiErrorToast } from "@/lib/api/show-api-error-toast"
+import { useToast } from "@/hooks/use-toast"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -46,9 +50,12 @@ export function AttributeSetDetailContent({ id }: { id: string }) {
   const [itemToDelete, setItemToDelete] = useState<{ id: string; name: string } | null>(null)
 
   const { hasPermission } = useAuth()
+  const { success, error: errorToast, warning } = useToast()
+
   const { data: set, isLoading } = useAttributeSet(id)
   const { data: items } = useSetItems(id)
   const { data: allAttributes } = useAttributes()
+
   const bulkAddMutation = useBulkAddSetItems(id)
   const bulkRemoveMutation = useBulkRemoveSetItems(id)
   const removeItemMutation = useRemoveSetItem(id)
@@ -61,56 +68,62 @@ export function AttributeSetDetailContent({ id }: { id: string }) {
   )
 
   const handleToggleAttribute = (attributeId: string) => {
-    const newSelected = new Set(selectedAttributeIds)
-    if (newSelected.has(attributeId)) {
-      newSelected.delete(attributeId)
-    } else {
-      newSelected.add(attributeId)
-    }
-    setSelectedAttributeIds(newSelected)
+    const next = new Set(selectedAttributeIds)
+    next.has(attributeId) ? next.delete(attributeId) : next.add(attributeId)
+    setSelectedAttributeIds(next)
   }
 
   const handleBulkAddAttributes = () => {
-    if (selectedAttributeIds.size > 0) {
-      bulkAddMutation.mutate(Array.from(selectedAttributeIds), {
-        onSuccess: () => {
-          setIsAddDialogOpen(false)
-          setSearchQuery("")
-          setSelectedAttributeIds(new Set())
-        },
-      })
-    }
+    if (selectedAttributeIds.size === 0) return
+
+    bulkAddMutation.mutate(Array.from(selectedAttributeIds), {
+      onSuccess: () => {
+        success("Attributes added", "Attributes were added to the set successfully.")
+        setIsAddDialogOpen(false)
+        setSearchQuery("")
+        setSelectedAttributeIds(new Set())
+      },
+      onError: (e: AxiosError) => {
+        const parsed = parseApiError(e)
+        showApiErrorToast(parsed, { error: errorToast, warning }, "Failed to add attributes.")
+      },
+    })
   }
 
   const handleToggleItemDelete = (itemId: string) => {
-    const newItems = new Set(itemsToDelete)
-    if (newItems.has(itemId)) {
-      newItems.delete(itemId)
-    } else {
-      newItems.add(itemId)
-    }
-    setItemsToDelete(newItems)
+    const next = new Set(itemsToDelete)
+    next.has(itemId) ? next.delete(itemId) : next.add(itemId)
+    setItemsToDelete(next)
   }
 
   const handleBulkRemoveItems = () => {
-    if (itemsToDelete.size > 0) {
-      bulkRemoveMutation.mutate(Array.from(itemsToDelete), {
-        onSuccess: () => {
-          setItemsToDelete(new Set())
-        },
-      })
-    }
-  }
+    if (itemsToDelete.size === 0) return
 
-  const handleRemoveItem = (itemId: string, attributeName: string) => {
-    setItemToDelete({ id: itemId, name: attributeName })
+    bulkRemoveMutation.mutate(Array.from(itemsToDelete), {
+      onSuccess: () => {
+        success("Attributes removed", "Selected attributes were removed successfully.")
+        setItemsToDelete(new Set())
+      },
+      onError: (e: AxiosError) => {
+        const parsed = parseApiError(e)
+        showApiErrorToast(parsed, { error: errorToast, warning }, "Failed to remove attributes.")
+      },
+    })
   }
 
   const confirmDelete = () => {
-    if (itemToDelete) {
-      removeItemMutation.mutate(itemToDelete.id)
-      setItemToDelete(null)
-    }
+    if (!itemToDelete) return
+
+    removeItemMutation.mutate(itemToDelete.id, {
+      onSuccess: () => {
+        success("Attribute removed", "The attribute was removed from the set successfully.")
+        setItemToDelete(null)
+      },
+      onError: (e: AxiosError) => {
+        const parsed = parseApiError(e)
+        showApiErrorToast(parsed, { error: errorToast, warning }, "Failed to remove attribute.")
+      },
+    })
   }
 
   if (isLoading) {
@@ -141,52 +154,43 @@ export function AttributeSetDetailContent({ id }: { id: string }) {
             <div>
               <CardTitle>Attributes</CardTitle>
               <CardDescription>
-                {items?.length || 0} attribute(s) in this set
+                {items?.length || 0} attribute(s)
                 {itemsToDelete.size > 0 && ` • ${itemsToDelete.size} selected for removal`}
               </CardDescription>
             </div>
             <div className="flex gap-2">
-              {itemsToDelete.size > 0 && (
-                hasPermission("attribute-set:assign-attribute") && (
-                  <Button variant="destructive" onClick={handleBulkRemoveItems} disabled={bulkRemoveMutation.isPending}>
-                    Remove {itemsToDelete.size} Selected
-                  </Button>)
+              {itemsToDelete.size > 0 && hasPermission("attribute-set:assign-attribute") && (
+                <Button
+                  variant="destructive"
+                  onClick={handleBulkRemoveItems}
+                  disabled={bulkRemoveMutation.isPending}
+                >
+                  Remove {itemsToDelete.size} Selected
+                </Button>
               )}
               {hasPermission("attribute-set:assign-attribute") && (
                 <Button onClick={() => setIsAddDialogOpen(true)}>
                   <Plus className="h-4 w-4 mr-2" />
                   Add Attributes
-                </Button>)}
+                </Button>
+              )}
             </div>
           </div>
         </CardHeader>
+
         <CardContent>
           {items && items.length > 0 ? (
             <div className="rounded-md border">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-12">
-                      <input
-                        type="checkbox"
-                        disabled={!hasPermission("attribute-set:assign-attribute")}
-                        checked={itemsToDelete.size > 0 && itemsToDelete.size === items.length}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setItemsToDelete(new Set(items.map((item) => item.id)))
-                          } else {
-                            setItemsToDelete(new Set())
-                          }
-                        }}
-                        className="rounded border-gray-300"
-                      />
-                    </TableHead>
+                    <TableHead className="w-12" />
                     <TableHead>Order</TableHead>
                     <TableHead>Name</TableHead>
                     <TableHead>Label</TableHead>
                     <TableHead>Type</TableHead>
                     <TableHead>Required</TableHead>
-                    <TableHead className="w-[70px]"></TableHead>
+                    <TableHead className="w-[70px]" />
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -203,7 +207,9 @@ export function AttributeSetDetailContent({ id }: { id: string }) {
                       <TableCell className="font-mono text-sm">{item.attribute?.name}</TableCell>
                       <TableCell className="font-medium">{item.attribute?.label}</TableCell>
                       <TableCell>
-                        <span className="px-2 py-1 bg-muted rounded text-xs">{item.attribute?.data_type}</span>
+                        <span className="px-2 py-1 bg-muted rounded text-xs">
+                          {item.attribute?.data_type}
+                        </span>
                       </TableCell>
                       <TableCell>{item.attribute?.is_required ? "Yes" : "No"}</TableCell>
                       <TableCell>
@@ -216,12 +222,19 @@ export function AttributeSetDetailContent({ id }: { id: string }) {
                           <DropdownMenuContent align="end">
                             <DropdownMenuLabel>Actions</DropdownMenuLabel>
                             <DropdownMenuSeparator />
-                            {hasPermission("attribute-set:assign-attribute") && (<DropdownMenuItem
-                              onClick={() => handleRemoveItem(item.id, item.attribute?.label || "")}
-                              className="text-destructive"
-                            >
-                              Remove
-                            </DropdownMenuItem>)}
+                            {hasPermission("attribute-set:assign-attribute") && (
+                              <DropdownMenuItem
+                                onClick={() =>
+                                  setItemToDelete({
+                                    id: item.id,
+                                    name: item.attribute?.label || "",
+                                  })
+                                }
+                                className="text-destructive"
+                              >
+                                Remove
+                              </DropdownMenuItem>
+                            )}
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>
@@ -231,7 +244,9 @@ export function AttributeSetDetailContent({ id }: { id: string }) {
               </Table>
             </div>
           ) : (
-            <div className="text-center text-muted-foreground py-8">No attributes in this set</div>
+            <div className="text-center text-muted-foreground py-8">
+              No attributes in this set
+            </div>
           )}
         </CardContent>
       </Card>
@@ -241,74 +256,48 @@ export function AttributeSetDetailContent({ id }: { id: string }) {
           <DialogHeader>
             <DialogTitle>Add Attributes to Set</DialogTitle>
             <DialogDescription>
-              Select one or multiple attributes to add to this set. Use the checkboxes for bulk selection.
+              Select one or multiple attributes to add to this set.
             </DialogDescription>
           </DialogHeader>
+
           <div className="space-y-4">
-            <div className="space-y-2">
-              <Label>Search Attributes</Label>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search by name or label..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-9"
-                />
-              </div>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search by name or label..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9"
+              />
             </div>
 
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label>
-                  Available Attributes
-                  {selectedAttributeIds.size > 0 && ` • ${selectedAttributeIds.size} selected`}
-                </Label>
-                {selectedAttributeIds.size > 0 && (
-                  <Button variant="ghost" size="sm" onClick={() => setSelectedAttributeIds(new Set())}>
-                    Clear Selection
-                  </Button>
-                )}
-              </div>
-              <ScrollArea className="h-64 rounded-md border p-4">
-                {availableAttributes && availableAttributes.length > 0 ? (
-                  <div className="space-y-3">
-                    {availableAttributes.map((attr) => (
-                      <div
-                        key={attr.id}
-                        className="p-3 rounded-md border border-transparent hover:border-border hover:bg-muted/50 transition-colors cursor-pointer"
-                        onClick={() => handleToggleAttribute(attr.id)}
-                      >
-                        <div className="flex items-start gap-3">
-                          <Checkbox
-                            checked={selectedAttributeIds.has(attr.id)}
-                            onCheckedChange={() => handleToggleAttribute(attr.id)}
-                            className="mt-1"
-                          />
-                          <div className="flex-1">
-                            <div className="font-medium text-sm">{attr.label}</div>
-                            <div className="text-xs text-muted-foreground">{attr.name}</div>
-                            <div className="flex gap-2 mt-2">
-                              <span className="px-2 py-1 bg-muted rounded text-xs">{attr.data_type}</span>
-                              {attr.is_required && (
-                                <span className="px-2 py-1 bg-red-100 dark:bg-red-950 text-red-700 dark:text-red-300 rounded text-xs">
-                                  Required
-                                </span>
-                              )}
-                            </div>
-                          </div>
+            <ScrollArea className="h-64 rounded-md border p-4">
+              {availableAttributes && availableAttributes.length > 0 ? (
+                <div className="space-y-3">
+                  {availableAttributes.map((attr) => (
+                    <div
+                      key={attr.id}
+                      className="p-3 rounded-md border cursor-pointer hover:bg-muted/50"
+                      onClick={() => handleToggleAttribute(attr.id)}
+                    >
+                      <div className="flex gap-3">
+                        <Checkbox checked={selectedAttributeIds.has(attr.id)} />
+                        <div className="flex-1">
+                          <div className="font-medium text-sm">{attr.label}</div>
+                          <div className="text-xs text-muted-foreground">{attr.name}</div>
                         </div>
                       </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center text-muted-foreground py-8">
-                    {searchQuery ? "No matching attributes found" : "All attributes are already in this set"}
-                  </div>
-                )}
-              </ScrollArea>
-            </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center text-muted-foreground py-8">
+                  No matching attributes found
+                </div>
+              )}
+            </ScrollArea>
           </div>
+
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setIsAddDialogOpen(false)}>
               Cancel
@@ -318,7 +307,7 @@ export function AttributeSetDetailContent({ id }: { id: string }) {
               disabled={selectedAttributeIds.size === 0 || bulkAddMutation.isPending}
             >
               <Check className="h-4 w-4 mr-2" />
-              Add {selectedAttributeIds.size} Attribute{selectedAttributeIds.size !== 1 ? "s" : ""}
+              Add {selectedAttributeIds.size}
             </Button>
           </DialogFooter>
         </DialogContent>

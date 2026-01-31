@@ -12,6 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { RequirePermission } from "@/components/auth/require-permission"
 import { useAuth } from "@/lib/hooks/use-auth"
+import { formatCurrency } from "@/lib/utils/currency"
 
 export function ProductDetailContent({ id }: { id: string }) {
   const router = useRouter()
@@ -129,7 +130,8 @@ export function ProductDetailContent({ id }: { id: string }) {
                 <CardContent>
                   <div>
                     <div className="text-sm font-medium text-muted-foreground">Base Price</div>
-                    <div className="text-2xl font-bold">{product.base_price ? `$${Number(product.base_price).toFixed(2)}` : "0.00"}</div>
+                    <div className="text-2xl font-bold">{formatCurrency(Number(product.base_price ?? 0), 'ETB')}
+</div>
                   </div>
                 </CardContent>
               </Card>

@@ -3,7 +3,11 @@
 import { useState } from "react"
 import { MoreHorizontal, Plus, Search, Eye, ChevronLeft, ChevronRight } from "lucide-react"
 import { useRouter } from "next/navigation"
+import type { AxiosError } from "axios"
 import { useBrands, useDeleteBrand } from "@/lib/hooks/use-brands"
+import { parseApiError } from "@/lib/api/parse-api-error"
+import { showApiErrorToast } from "@/lib/api/show-api-error-toast"
+import { useToast } from "@/hooks/use-toast"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -29,6 +33,8 @@ export function BrandTable() {
   const [page, setPage] = useState(1)
 
   const { hasPermission } = useAuth()
+  const { success, error, warning } = useToast()
+
   const { data: brands, isLoading } = useBrands()
   const deleteMutation = useDeleteBrand()
 
@@ -48,9 +54,17 @@ export function BrandTable() {
   }
 
   const confirmDelete = () => {
-    if (brandToDelete) {
-      deleteMutation.mutate(brandToDelete.id)
-    }
+    if (!brandToDelete) return
+
+    deleteMutation.mutate(brandToDelete.id, {
+      onSuccess: () => {
+        success("Brand deleted", "The brand was deleted successfully.")
+        setBrandToDelete(null)
+      },
+      onError: (e: AxiosError) => {
+        showApiErrorToast(parseApiError(e), { error, warning }, "Failed to delete brand.")
+      },
+    })
   }
 
   const handleViewDetails = (id: string) => {
@@ -81,7 +95,8 @@ export function BrandTable() {
           >
             <Plus className="h-4 w-4 mr-2" />
             Add Brand
-          </Button>)}
+          </Button>
+        )}
       </div>
 
       <div className="rounded-md border">
@@ -123,11 +138,15 @@ export function BrandTable() {
                           <Eye className="h-4 w-4 mr-2" />
                           View Details
                         </DropdownMenuItem>
-                        {hasPermission("brand:update") && (<DropdownMenuItem onClick={() => handleEdit(brand)}>Edit</DropdownMenuItem>)}
+                        {hasPermission("brand:update") && (
+                          <DropdownMenuItem onClick={() => handleEdit(brand)}>Edit</DropdownMenuItem>
+                        )}
                         <DropdownMenuSeparator />
-                        {hasPermission("brand:delete") && (<DropdownMenuItem onClick={() => handleDelete(brand)} className="text-destructive">
-                          Delete
-                        </DropdownMenuItem>)}
+                        {hasPermission("brand:delete") && (
+                          <DropdownMenuItem onClick={() => handleDelete(brand)} className="text-destructive">
+                            Delete
+                          </DropdownMenuItem>
+                        )}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>

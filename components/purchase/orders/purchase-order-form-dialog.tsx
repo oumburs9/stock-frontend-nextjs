@@ -1,18 +1,29 @@
 "use client"
 
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 import { useForm, useFieldArray } from "react-hook-form"
-import { useCreatePurchaseOrder, useUpdatePurchaseOrder } from "@/lib/hooks/use-purchase-orders"
+import type { AxiosError } from "axios"
+
+import {
+  useCreatePurchaseOrder,
+  useUpdatePurchaseOrder,
+} from "@/lib/hooks/use-purchase-orders"
 import { useProducts } from "@/lib/hooks/use-products"
 import { usePartners } from "@/lib/hooks/use-partners"
+
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { useToast } from "@/hooks/use-toast"
+
 import { Plus, Trash2 } from "lucide-react"
 import { SearchableCombobox } from "@/components/shared/searchable-combobox"
+
+import { useToast } from "@/hooks/use-toast"
+import { parseApiError } from "@/lib/api/parse-api-error"
+import { showApiErrorToast } from "@/lib/api/show-api-error-toast"
+
 import type { PurchaseOrder, CreatePurchaseOrderRequest } from "@/lib/types/purchase"
 import { useAuth } from "@/lib/hooks/use-auth"
 
@@ -22,8 +33,12 @@ interface PurchaseOrderFormDialogProps {
   onOpenChange: (open: boolean) => void
 }
 
-export function PurchaseOrderFormDialog({ purchaseOrder, open, onOpenChange }: PurchaseOrderFormDialogProps) {
-  const { toast } = useToast()
+export function PurchaseOrderFormDialog({
+  purchaseOrder,
+  open,
+  onOpenChange,
+}: PurchaseOrderFormDialogProps) {
+  const toast = useToast()
   const createMutation = useCreatePurchaseOrder()
   const updateMutation = useUpdatePurchaseOrder()
   const { data: products } = useProducts()
@@ -37,6 +52,7 @@ export function PurchaseOrderFormDialog({ purchaseOrder, open, onOpenChange }: P
     control,
     watch,
     setValue,
+    setError,
     formState: { errors },
   } = useForm<CreatePurchaseOrderRequest>({
     defaultValues: {
@@ -55,7 +71,11 @@ export function PurchaseOrderFormDialog({ purchaseOrder, open, onOpenChange }: P
     name: "items",
   })
 
+  const [formError, setFormError] = useState<string | null>(null)
+
   useEffect(() => {
+    setFormError(null)
+
     if (purchaseOrder) {
       reset({
         code: purchaseOrder.code,
@@ -83,10 +103,11 @@ export function PurchaseOrderFormDialog({ purchaseOrder, open, onOpenChange }: P
     }
   }, [purchaseOrder, reset])
 
-  const onSubmit = async (data: CreatePurchaseOrderRequest) => {
-    try {
-      if (purchaseOrder) {
-        await updateMutation.mutateAsync({
+  const onSubmit = (data: CreatePurchaseOrderRequest) => {
+    setFormError(null)
+
+    const action = purchaseOrder
+      ? updateMutation.mutateAsync({
           id: purchaseOrder.id,
           data: {
             supplier_id: data.supplier_id,
@@ -97,26 +118,27 @@ export function PurchaseOrderFormDialog({ purchaseOrder, open, onOpenChange }: P
             items: data.items,
           },
         })
-        toast({
-          title: "Success",
-          description: "Purchase order updated successfully",
-        })
-      } else {
-        await createMutation.mutateAsync(data)
-        toast({
-          title: "Success",
-          description: "Purchase order created successfully",
-        })
-      }
-      onOpenChange(false)
-      reset()
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.response?.data?.message || "An error occurred",
-        variant: "destructive",
+      : createMutation.mutateAsync(data)
+
+    action
+      .then(() => {
+        toast.success(purchaseOrder ? "Purchase order updated" : "Purchase order created")
+        onOpenChange(false)
+        reset()
       })
-    }
+      .catch((e: AxiosError) => {
+        const parsed = parseApiError(e)
+
+        if (parsed.type === "validation") {
+          Object.entries(parsed.fieldErrors).forEach(([field, message]) => {
+            setError(field as any, { message })
+          })
+          if (parsed.formError) setFormError(parsed.formError)
+          return
+        }
+
+        showApiErrorToast(parsed, toast)
+      })
   }
 
   const supplierOptions =
@@ -135,19 +157,30 @@ export function PurchaseOrderFormDialog({ purchaseOrder, open, onOpenChange }: P
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{purchaseOrder ? "Edit Purchase Order" : "Create Purchase Order"}</DialogTitle>
+          <DialogTitle>
+            {purchaseOrder ? "Edit Purchase Order" : "Create Purchase Order"}
+          </DialogTitle>
         </DialogHeader>
+
+        {formError && (
+          <div className="rounded-md border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">
+            {formError}
+          </div>
+        )}
+
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="code">PO Code *</Label>
               <Input
                 id="code"
-                {...register("code", { required: "Code is required" })}
+                {...register("code")}
                 disabled={!!purchaseOrder}
                 placeholder="PO-001"
               />
-              {errors.code && <p className="text-sm text-destructive">{errors.code.message}</p>}
+              {errors.code?.message && (
+                <p className="text-sm text-destructive">{errors.code.message}</p>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -160,15 +193,19 @@ export function PurchaseOrderFormDialog({ purchaseOrder, open, onOpenChange }: P
                 searchPlaceholder="Search suppliers..."
                 emptyMessage="No suppliers found."
               />
-              {errors.supplier_id && <p className="text-sm text-destructive">{errors.supplier_id.message}</p>}
+              {errors.supplier_id?.message && (
+                <p className="text-sm text-destructive">{errors.supplier_id.message}</p>
+              )}
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="order_date">Order Date *</Label>
-              <Input id="order_date" type="date" {...register("order_date", { required: "Order date is required" })} />
-              {errors.order_date && <p className="text-sm text-destructive">{errors.order_date.message}</p>}
+              <Input id="order_date" type="date" {...register("order_date")} />
+              {errors.order_date?.message && (
+                <p className="text-sm text-destructive">{errors.order_date.message}</p>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -180,19 +217,21 @@ export function PurchaseOrderFormDialog({ purchaseOrder, open, onOpenChange }: P
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="currency">Currency *</Label>
-              <Input
-                id="currency"
-                {...register("currency", { required: "Currency is required" })}
-                placeholder="ETB"
-                defaultValue="ETB"
-              />
-              {errors.currency && <p className="text-sm text-destructive">{errors.currency.message}</p>}
+              <Input id="currency" {...register("currency")} placeholder="ETB" />
+              {errors.currency?.message && (
+                <p className="text-sm text-destructive">{errors.currency.message}</p>
+              )}
             </div>
           </div>
 
           <div className="space-y-2">
             <Label htmlFor="notes">Notes</Label>
-            <Textarea id="notes" {...register("notes")} placeholder="Enter any additional notes..." rows={3} />
+            <Textarea
+              id="notes"
+              {...register("notes")}
+              placeholder="Enter any additional notes..."
+              rows={3}
+            />
           </div>
 
           <div className="space-y-3">
@@ -202,7 +241,9 @@ export function PurchaseOrderFormDialog({ purchaseOrder, open, onOpenChange }: P
                 type="button"
                 size="sm"
                 variant="outline"
-                onClick={() => append({ product_id: "", quantity: "1", unit_price: "0" })}
+                onClick={() =>
+                  append({ product_id: "", quantity: "1", unit_price: "0" })
+                }
               >
                 <Plus className="h-4 w-4 mr-1" />
                 Add Item
@@ -210,19 +251,26 @@ export function PurchaseOrderFormDialog({ purchaseOrder, open, onOpenChange }: P
             </div>
 
             {fields.map((field, index) => (
-              <div key={field.id} className="flex gap-2 items-start p-3 border rounded-md bg-muted/30">
+              <div
+                key={field.id}
+                className="flex gap-2 items-start p-3 border rounded-md bg-muted/30"
+              >
                 <div className="flex-1 space-y-2">
                   <Label className="text-xs text-muted-foreground">Product</Label>
                   <SearchableCombobox
                     value={watch(`items.${index}.product_id`)}
-                    onChange={(value) => setValue(`items.${index}.product_id`, value)}
+                    onChange={(value) =>
+                      setValue(`items.${index}.product_id`, value)
+                    }
                     options={productOptions}
                     placeholder="Select product..."
                     searchPlaceholder="Search products..."
                     emptyMessage="No products found."
                   />
-                  {errors.items?.[index]?.product_id && (
-                    <p className="text-sm text-destructive">{errors.items[index]?.product_id?.message}</p>
+                  {errors.items?.[index]?.product_id?.message && (
+                    <p className="text-sm text-destructive">
+                      {errors.items[index]?.product_id?.message}
+                    </p>
                   )}
                 </div>
 
@@ -232,10 +280,12 @@ export function PurchaseOrderFormDialog({ purchaseOrder, open, onOpenChange }: P
                     type="number"
                     step="0.01"
                     placeholder="Qty"
-                    {...register(`items.${index}.quantity`, { required: "Required" })}
+                    {...register(`items.${index}.quantity`)}
                   />
-                  {errors.items?.[index]?.quantity && (
-                    <p className="text-xs text-destructive">{errors.items[index]?.quantity?.message}</p>
+                  {errors.items?.[index]?.quantity?.message && (
+                    <p className="text-xs text-destructive">
+                      {errors.items[index]?.quantity?.message}
+                    </p>
                   )}
                 </div>
 
@@ -245,10 +295,12 @@ export function PurchaseOrderFormDialog({ purchaseOrder, open, onOpenChange }: P
                     type="number"
                     step="0.01"
                     placeholder="Price"
-                    {...register(`items.${index}.unit_price`, { required: "Required" })}
+                    {...register(`items.${index}.unit_price`)}
                   />
-                  {errors.items?.[index]?.unit_price && (
-                    <p className="text-xs text-destructive">{errors.items[index]?.unit_price?.message}</p>
+                  {errors.items?.[index]?.unit_price?.message && (
+                    <p className="text-xs text-destructive">
+                      {errors.items[index]?.unit_price?.message}
+                    </p>
                   )}
                 </div>
 
@@ -271,16 +323,17 @@ export function PurchaseOrderFormDialog({ purchaseOrder, open, onOpenChange }: P
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button 
-              type="submit" 
+            <Button
+              type="submit"
               disabled={
                 Boolean(
-                  createMutation.isPending || updateMutation.isPending ||
+                  createMutation.isPending ||
+                  updateMutation.isPending ||
                   (!purchaseOrder && !hasPermission("purchase-order:create")) ||
-                  (purchaseOrder !== null && !hasPermission("purchase-order:update"))
+                  (purchaseOrder && !hasPermission("purchase-order:update"))
                 )
               }
-              >
+            >
               {createMutation.isPending || updateMutation.isPending ? "Saving..." : "Save"}
             </Button>
           </DialogFooter>

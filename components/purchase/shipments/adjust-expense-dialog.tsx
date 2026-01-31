@@ -12,6 +12,9 @@ import type { ShipmentExpense } from "@/lib/types/purchase"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { InfoIcon } from "lucide-react"
 import { useAuth } from "@/lib/hooks/use-auth"
+import type { AxiosError } from "axios"
+import { parseApiError } from "@/lib/api/parse-api-error"
+import { showApiErrorToast } from "@/lib/api/show-api-error-toast"
 
 interface AdjustShipmentExpenseDialogProps {
   expense: ShipmentExpense
@@ -26,7 +29,7 @@ export function AdjustShipmentExpenseDialog({
   open,
   onOpenChange,
 }: AdjustShipmentExpenseDialogProps) {
-  const { toast } = useToast()
+  const toast = useToast()
   const { hasPermission } = useAuth()
   const adjustMutation = useAddShipmentExpenseAdjustment()
 
@@ -49,29 +52,22 @@ export function AdjustShipmentExpenseDialog({
 
   const onSubmit = async (data: { amount: string; reason: string }) => {
     if (!canAdjust) {
-      toast({
-        title: "Cannot Adjust",
-        description: "Adjustments not allowed for received/closed shipments",
-        variant: "destructive",
-      })
+      toast.error("Cannot Adjust", "Adjustments not allowed for received/closed shipments")
       return
     }
 
     if (Number.parseFloat(data.amount) === 0) {
-      toast({
-        title: "Invalid Amount",
-        description: "Adjustment amount cannot be zero",
-        variant: "destructive",
-      })
+      toast.error("Invalid Amount", "Adjustment amount cannot be zero")
       return
     }
 
     try {
       await adjustMutation.mutateAsync({ expenseId: expense.id, data })
+      toast.success("Adjustment added", "Expense adjustment added successfully")
       onOpenChange(false)
       reset()
-    } catch (error: any) {
-      // Error handled by mutation
+    } catch (e) {
+      showApiErrorToast(parseApiError(e as AxiosError), toast, "Failed to add adjustment")
     }
   }
 
@@ -81,6 +77,7 @@ export function AdjustShipmentExpenseDialog({
         <DialogHeader>
           <DialogTitle>Adjust Shipment Expense</DialogTitle>
         </DialogHeader>
+
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <Alert>
             <InfoIcon className="h-4 w-4" />
@@ -94,16 +91,22 @@ export function AdjustShipmentExpenseDialog({
             <div className="p-3 border rounded-md bg-muted/50">
               <div className="flex justify-between items-center">
                 <span className="text-sm font-medium capitalize">{expense.type}</span>
-                <span className="text-sm font-mono">${Number.parseFloat(expense.amount).toFixed(2)}</span>
+                <span className="text-sm font-mono">
+                  ${Number.parseFloat(expense.amount).toFixed(2)}
+                </span>
               </div>
-              {expense.description && <p className="text-sm text-muted-foreground mt-1">{expense.description}</p>}
+              {expense.description && (
+                <p className="text-sm text-muted-foreground mt-1">{expense.description}</p>
+              )}
             </div>
           </div>
 
           <div className="space-y-2">
             <Label htmlFor="amount">
               Adjustment Amount *
-              <span className="text-xs text-muted-foreground ml-2">(use negative for reductions)</span>
+              <span className="text-xs text-muted-foreground ml-2">
+                (use negative for reductions)
+              </span>
             </Label>
             <Input
               id="amount"
@@ -113,7 +116,9 @@ export function AdjustShipmentExpenseDialog({
               {...register("amount", { required: "Amount is required" })}
               disabled={!canAdjust}
             />
-            {errors.amount && <p className="text-sm text-destructive">{errors.amount.message}</p>}
+            {errors.amount && (
+              <p className="text-sm text-destructive">{errors.amount.message}</p>
+            )}
           </div>
 
           <div className="space-y-2">
@@ -129,8 +134,8 @@ export function AdjustShipmentExpenseDialog({
 
           {!canAdjust && (
             <p className="text-sm text-destructive">
-              Adjustments can only be made for shipments in draft, in_transit, arrived, cleared, or partially_received
-              status
+              Adjustments can only be made for shipments in draft, in_transit, arrived, cleared, or
+              partially_received status
             </p>
           )}
 
@@ -138,13 +143,14 @@ export function AdjustShipmentExpenseDialog({
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button 
-              type="submit" 
+            <Button
+              type="submit"
               disabled={
-                adjustMutation.isPending || !canAdjust ||
+                adjustMutation.isPending ||
+                !canAdjust ||
                 !hasPermission("purchase-shipment-expense:adjust")
-                }
-                >
+              }
+            >
               {adjustMutation.isPending ? "Adjusting..." : "Add Adjustment"}
             </Button>
           </DialogFooter>

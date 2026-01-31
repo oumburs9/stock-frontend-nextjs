@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react"
 import { useForm, useWatch } from "react-hook-form"
+import type { AxiosError } from "axios"
 import { useAddSalesOrderItem, usePriceQuote } from "@/lib/hooks/use-sales"
 import { useProducts } from "@/lib/hooks/use-products"
 import { useStockByLocation } from "@/lib/hooks/use-stock-by-location"
@@ -17,9 +18,11 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { TrendingUp, Info, Tag, Package, AlertTriangle, CheckCircle2 } from "lucide-react"
 import { formatCurrency } from "@/lib/utils/currency"
 import type { AddSalesOrderItemRequest } from "@/lib/types/sales"
-import { useToast } from "@/components/ui/use-toast"
+import { useToast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/lib/hooks/use-auth"
+import { parseApiError } from "@/lib/api/parse-api-error"
+import { showApiErrorToast } from "@/lib/api/show-api-error-toast"
 
 interface AddSalesOrderItemDialogProps {
   salesOrderId: string
@@ -36,10 +39,11 @@ export function AddSalesOrderItemDialog({
   open,
   onOpenChange,
 }: AddSalesOrderItemDialogProps) {
-  const { toast } = useToast()
+  const toast = useToast()
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null)
   const [manualPriceEdit, setManualPriceEdit] = useState(false)
   const [selectedTaxRuleId, setSelectedTaxRuleId] = useState<string | null>(null)
+  const [formError, setFormError] = useState<string | null>(null)
 
   const { hasPermission } = useAuth()
   const { data: products } = useProducts()
@@ -59,6 +63,7 @@ export function AddSalesOrderItemDialog({
     reset,
     watch,
     setValue,
+    setError,
     control,
     formState: { errors },
   } = useForm<AddSalesOrderItemRequest>({
@@ -129,7 +134,6 @@ export function AddSalesOrderItemDialog({
 
   useEffect(() => {
     if (!priceQuote?.listPrice) return
-
     if (manualPriceEdit) return
 
     const listPrice = Number.parseFloat(priceQuote.listPrice)
@@ -153,14 +157,12 @@ export function AddSalesOrderItemDialog({
   }, [selectedProductId])
 
   const onSubmit = async (data: AddSalesOrderItemRequest) => {
+    setFormError(null)
+
     if (selectedProductStock) {
       const requestedQty = Number.parseFloat(data.quantity)
       if (requestedQty > selectedProductStock.available) {
-        toast({
-          title: "Insufficient Stock",
-          description: `Only ${selectedProductStock.available} units available at this location`,
-          variant: "destructive",
-        })
+        toast.error("Insufficient Stock", `Only ${selectedProductStock.available} units available at this location`)
         return
       }
     }
@@ -173,21 +175,25 @@ export function AddSalesOrderItemDialog({
           productId: selectedProductId!,
         },
       })
-      toast({
-        title: "Success",
-        description: "Item added to sales order successfully",
-      })
+
+      toast.success("Item added to sales order successfully")
       onOpenChange(false)
       reset()
       setSelectedProductId(null)
       setManualPriceEdit(false)
       setSelectedTaxRuleId(null)
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.response?.data?.message || "Failed to add item",
-        variant: "destructive",
-      })
+    } catch (e) {
+      const parsed = parseApiError(e as AxiosError)
+
+      if (parsed.type === "validation") {
+        Object.entries(parsed.fieldErrors).forEach(([field, message]) => {
+          setError(field as keyof AddSalesOrderItemRequest, { message })
+        })
+        if (parsed.formError) setFormError(parsed.formError)
+        return
+      }
+
+      showApiErrorToast(parsed, toast, "Failed to add item")
     }
   }
 
@@ -211,6 +217,13 @@ export function AddSalesOrderItemDialog({
         <DialogHeader>
           <DialogTitle>Add Order Item</DialogTitle>
         </DialogHeader>
+
+        {formError && (
+          <div className="rounded-md border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">
+            {formError}
+          </div>
+        )}
+
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="space-y-2">
             <Label>Product *</Label>
@@ -225,7 +238,9 @@ export function AddSalesOrderItemDialog({
               searchPlaceholder="Search products..."
               emptyMessage="No products found."
             />
-            {errors.productId && <p className="text-sm text-destructive">{errors.productId.message}</p>}
+            {errors.productId?.message && (
+              <p className="text-sm text-destructive">{errors.productId.message}</p>
+            )}
           </div>
 
           {selectedProductStock && (
@@ -369,19 +384,16 @@ export function AddSalesOrderItemDialog({
 
           <div className="space-y-2">
             <Label htmlFor="quantity">Quantity *</Label>
-            <Input
-              id="quantity"
-              type="number"
-              step="0.01"
-              {...register("quantity", { required: "Quantity is required" })}
-            />
+            <Input id="quantity" type="number" step="0.01" {...register("quantity")} />
             {selectedProductStock && Number.parseFloat(quantity || "0") > selectedProductStock.available && (
               <p className="text-sm text-destructive flex items-center gap-1">
                 <AlertTriangle className="h-3.5 w-3.5" />
                 Quantity exceeds available stock ({selectedProductStock.available} units)
               </p>
             )}
-            {errors.quantity && <p className="text-sm text-destructive">{errors.quantity.message}</p>}
+            {errors.quantity?.message && (
+              <p className="text-sm text-destructive">{errors.quantity.message}</p>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-4">

@@ -1,19 +1,25 @@
 'use client'
 
-// Inspired by react-hot-toast library
 import * as React from 'react'
 
-import type { ToastActionElement, ToastProps } from '@/components/ui/toast'
+import type { ToastActionElement } from '../components/ui/toast'
 
-const TOAST_LIMIT = 1
+const TOAST_LIMIT = 5
 const TOAST_REMOVE_DELAY = 1000000
 
-type ToasterToast = ToastProps & {
+export type ToastIntent = 'default' | 'success' | 'error' | 'warning' | 'info'
+export interface ToastState {
   id: string
   title?: React.ReactNode
   description?: React.ReactNode
   action?: ToastActionElement
+  intent?: ToastIntent
+  duration?: number
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
 }
+
+type ToasterToast = ToastState
 
 const actionTypes = {
   ADD_TOAST: 'ADD_TOAST',
@@ -90,8 +96,6 @@ export const reducer = (state: State, action: Action): State => {
     case 'DISMISS_TOAST': {
       const { toastId } = action
 
-      // ! Side effects ! - This could be extracted into a dismissToast() action,
-      // but I'll keep it here for simplicity
       if (toastId) {
         addToRemoveQueue(toastId)
       } else {
@@ -139,7 +143,7 @@ function dispatch(action: Action) {
 
 type Toast = Omit<ToasterToast, 'id'>
 
-function toast({ ...props }: Toast) {
+function toast({ duration = 4000, ...props }: Toast) {
   const id = genId()
 
   const update = (props: ToasterToast) =>
@@ -155,17 +159,57 @@ function toast({ ...props }: Toast) {
       ...props,
       id,
       open: true,
+      duration,
       onOpenChange: (open) => {
         if (!open) dismiss()
       },
     },
   })
 
+  // Auto-dismiss after duration
+  if (duration > 0) {
+    setTimeout(() => {
+      dismiss()
+    }, duration)
+  }
+
   return {
     id: id,
     dismiss,
     update,
   }
+}
+
+// Convenience methods for different toast types
+const toastMethods = {
+  success: (title: string, description?: string, duration?: number) =>
+    toast({
+      intent: 'success',
+      title,
+      description,
+      duration,
+    }),
+  error: (title: string, description?: string, duration?: number) =>
+    toast({
+      intent: 'error',
+      title,
+      description,
+      duration: duration ?? 5000,
+    }),
+  warning: (title: string, description?: string, duration?: number) =>
+    toast({
+      intent: 'warning',
+      title,
+      description,
+      duration: duration ?? 4000,
+    }),
+  info: (title: string, description?: string, duration?: number) =>
+    toast({
+      intent: 'info',
+      title,
+      description,
+      duration,
+    }),
 }
 
 function useToast() {
@@ -184,6 +228,7 @@ function useToast() {
   return {
     ...state,
     toast,
+    ...toastMethods,
     dismiss: (toastId?: string) => dispatch({ type: 'DISMISS_TOAST', toastId }),
   }
 }

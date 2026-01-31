@@ -19,6 +19,10 @@ import { PaymentSourceFormDialog } from "./payment-source-form-dialog"
 import { ConfirmDeleteDialog } from "@/components/shared/confirm-delete-dialog"
 import type { PaymentSource } from "@/lib/types/payment-source"
 import { useAuth } from "@/lib/hooks/use-auth"
+import type { AxiosError } from "axios"
+import { parseApiError } from "@/lib/api/parse-api-error"
+import { showApiErrorToast } from "@/lib/api/show-api-error-toast"
+import { useToast } from "@/hooks/use-toast"
 
 export function PaymentSourceTable() {
   const [search, setSearch] = useState("")
@@ -26,6 +30,7 @@ export function PaymentSourceTable() {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [sourceToDelete, setSourceToDelete] = useState<PaymentSource | null>(null)
 
+  const toast = useToast()
   const { hasPermission } = useAuth()
   const { data: sources, isLoading } = usePaymentSources()
   const deleteMutation = useDeletePaymentSource()
@@ -46,9 +51,16 @@ export function PaymentSourceTable() {
   }
 
   const confirmDelete = () => {
-    if (sourceToDelete) {
-      deleteMutation.mutate(sourceToDelete.id)
-    }
+    if (!sourceToDelete) return
+
+    deleteMutation.mutate(sourceToDelete.id, {
+      onSuccess: () => {
+        toast.success("Payment source deleted", "The payment source was deleted successfully.")
+        setSourceToDelete(null)
+      },
+      onError: (e: AxiosError) =>
+        showApiErrorToast(parseApiError(e), toast, "Failed to delete payment source.")
+    })
   }
 
   const getTypeLabel = (type: string) => {
@@ -85,7 +97,8 @@ export function PaymentSourceTable() {
           >
             <Plus className="h-4 w-4 mr-2" />
             Add Payment Source
-          </Button>)}
+          </Button>
+        )}
       </div>
 
       <div className="rounded-md border">
@@ -139,15 +152,22 @@ export function PaymentSourceTable() {
                       <DropdownMenuContent align="end">
                         <DropdownMenuLabel>Actions</DropdownMenuLabel>
                         <DropdownMenuSeparator />
-                        {hasPermission("payment-source:update") && (<DropdownMenuItem onClick={() => handleEdit(source)}>
-                          <Pencil className="h-4 w-4 mr-2" />
-                          Edit
-                        </DropdownMenuItem>)}
+                        {hasPermission("payment-source:update") && (
+                          <DropdownMenuItem onClick={() => handleEdit(source)}>
+                            <Pencil className="h-4 w-4 mr-2" />
+                            Edit
+                          </DropdownMenuItem>
+                        )}
                         <DropdownMenuSeparator />
-                        {hasPermission("payment-source:delete") && (<DropdownMenuItem onClick={() => handleDelete(source)} className="text-destructive">
-                          <Trash2 className="h-4 w-4 mr-2" />
-                          Delete
-                        </DropdownMenuItem>)}
+                        {hasPermission("payment-source:delete") && (
+                          <DropdownMenuItem
+                            onClick={() => handleDelete(source)}
+                            className="text-destructive"
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Delete
+                          </DropdownMenuItem>
+                        )}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>
@@ -158,7 +178,12 @@ export function PaymentSourceTable() {
         </Table>
       </div>
 
-      <PaymentSourceFormDialog paymentSource={selectedSource} open={isDialogOpen} onOpenChange={setIsDialogOpen} />
+      <PaymentSourceFormDialog
+        paymentSource={selectedSource}
+        open={isDialogOpen}
+        onOpenChange={setIsDialogOpen}
+      />
+
       <ConfirmDeleteDialog
         open={!!sourceToDelete}
         onOpenChange={(open) => !open && setSourceToDelete(null)}

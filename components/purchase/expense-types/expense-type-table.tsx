@@ -1,11 +1,27 @@
 "use client"
 
 import { useState } from "react"
-import { ChevronLeft, ChevronRight, MoreHorizontal, Plus, Search, X } from "lucide-react"
+import {
+  ChevronLeft,
+  ChevronRight,
+  MoreHorizontal,
+  Plus,
+  Search,
+  X,
+} from "lucide-react"
+import type { AxiosError } from "axios"
+
 import { useExpenseTypes, useDeleteExpenseType } from "@/lib/hooks/use-expense-types"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,10 +31,16 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Badge } from "@/components/ui/badge"
+
 import { ExpenseTypeFormDialog } from "./expense-type-form-dialog"
 import { ConfirmDeleteDialog } from "@/components/shared/confirm-delete-dialog"
+
 import type { ExpenseType } from "@/lib/types/purchase"
 import { useAuth } from "@/lib/hooks/use-auth"
+
+import { useToast } from "@/hooks/use-toast"
+import { parseApiError } from "@/lib/api/parse-api-error"
+import { showApiErrorToast } from "@/lib/api/show-api-error-toast"
 
 export function ExpenseTypeTable() {
   const [search, setSearch] = useState("")
@@ -27,14 +49,17 @@ export function ExpenseTypeTable() {
   const [selectedExpenseType, setSelectedExpenseType] = useState<ExpenseType | null>(null)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [expenseTypeToDelete, setExpenseTypeToDelete] = useState<ExpenseType | null>(null)
-    const [page, setPage] = useState(1)
+  const [page, setPage] = useState(1)
 
+  const toast = useToast()
   const { hasPermission } = useAuth()
+
   const { data: expenseTypes, isLoading } = useExpenseTypes({
     q: search || undefined,
     scope: scopeFilter || undefined,
     active: activeFilter,
   })
+
   const deleteMutation = useDeleteExpenseType()
 
   const handleEdit = (expenseType: ExpenseType) => {
@@ -47,11 +72,17 @@ export function ExpenseTypeTable() {
   }
 
   const confirmDelete = () => {
+    if (!expenseTypeToDelete) return
     if (!hasPermission("purchase-expense-type:delete")) return
 
-    if (expenseTypeToDelete) {
-      deleteMutation.mutate(expenseTypeToDelete.id)
-    }
+    deleteMutation.mutate(expenseTypeToDelete.id, {
+      onSuccess: () => {
+        toast.success("Expense type deleted")
+        setExpenseTypeToDelete(null)
+      },
+      onError: (e: AxiosError) =>
+        showApiErrorToast(parseApiError(e), toast, "Failed to delete expense type."),
+    })
   }
 
   const hasFilters = scopeFilter || activeFilter !== undefined
@@ -60,7 +91,6 @@ export function ExpenseTypeTable() {
   const startIndex = (page - 1) * itemsPerPage
   const paginatedExpenseTypes = expenseTypes?.slice(startIndex, startIndex + itemsPerPage)
   const totalPages = Math.ceil((expenseTypes?.length || 0) / itemsPerPage)
-
 
   return (
     <div className="space-y-4">
@@ -74,6 +104,7 @@ export function ExpenseTypeTable() {
             className="pl-9"
           />
         </div>
+
         {hasPermission("purchase-expense-type:create") && (
           <Button
             onClick={() => {
@@ -83,13 +114,15 @@ export function ExpenseTypeTable() {
           >
             <Plus className="h-4 w-4 mr-2" />
             New Expense Type
-          </Button>)}
+          </Button>
+        )}
       </div>
 
       <div className="flex gap-2 flex-wrap items-center">
         <div className="flex items-center gap-2">
           <span className="text-sm text-muted-foreground">Filters:</span>
         </div>
+
         <select
           value={scopeFilter}
           onChange={(e) => setScopeFilter(e.target.value as "shipment" | "batch" | "")}
@@ -99,15 +132,21 @@ export function ExpenseTypeTable() {
           <option value="shipment">Shipment</option>
           <option value="batch">Batch</option>
         </select>
+
         <select
           value={activeFilter === undefined ? "" : activeFilter ? "true" : "false"}
-          onChange={(e) => setActiveFilter(e.target.value === "" ? undefined : e.target.value === "true")}
+          onChange={(e) =>
+            setActiveFilter(
+              e.target.value === "" ? undefined : e.target.value === "true",
+            )
+          }
           className="px-3 py-1 text-sm border border-input rounded-md bg-background text-foreground hover:bg-accent focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
         >
           <option value="">All Status</option>
           <option value="true">Active</option>
           <option value="false">Inactive</option>
         </select>
+
         {hasFilters && (
           <Button
             size="sm"
@@ -152,19 +191,31 @@ export function ExpenseTypeTable() {
             ) : (
               paginatedExpenseTypes?.map((expenseType) => (
                 <TableRow key={expenseType.id}>
-                  <TableCell className="font-mono text-sm">{expenseType.code}</TableCell>
-                  <TableCell className="font-medium">{expenseType.name}</TableCell>
+                  <TableCell className="font-mono text-sm">
+                    {expenseType.code}
+                  </TableCell>
+                  <TableCell className="font-medium">
+                    {expenseType.name}
+                  </TableCell>
                   <TableCell>
-                    <Badge variant={expenseType.scope === "shipment" ? "default" : "secondary"}>
+                    <Badge
+                      variant={
+                        expenseType.scope === "shipment" ? "default" : "secondary"
+                      }
+                    >
                       {expenseType.scope}
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    <Badge variant={expenseType.is_active ? "default" : "secondary"}>
+                    <Badge
+                      variant={expenseType.is_active ? "default" : "secondary"}
+                    >
                       {expenseType.is_active ? "Active" : "Inactive"}
                     </Badge>
                   </TableCell>
-                  <TableCell>{expenseType.capitalizable ? "Yes" : "No"}</TableCell>
+                  <TableCell>
+                    {expenseType.capitalizable ? "Yes" : "No"}
+                  </TableCell>
                   <TableCell className="text-muted-foreground">
                     {expenseType.default_allocation_method || "-"}
                   </TableCell>
@@ -178,11 +229,22 @@ export function ExpenseTypeTable() {
                       <DropdownMenuContent align="end">
                         <DropdownMenuLabel>Actions</DropdownMenuLabel>
                         <DropdownMenuSeparator />
-                        {hasPermission("purchase-expense-type:update") && (<DropdownMenuItem onClick={() => handleEdit(expenseType)}>Edit</DropdownMenuItem>)}
+                        {hasPermission("purchase-expense-type:update") && (
+                          <DropdownMenuItem
+                            onClick={() => handleEdit(expenseType)}
+                          >
+                            Edit
+                          </DropdownMenuItem>
+                        )}
                         <DropdownMenuSeparator />
-                        {hasPermission("purchase-expense-type:delete") && (<DropdownMenuItem onClick={() => handleDelete(expenseType)} className="text-destructive">
-                          Delete
-                        </DropdownMenuItem>)}
+                        {hasPermission("purchase-expense-type:delete") && (
+                          <DropdownMenuItem
+                            onClick={() => handleDelete(expenseType)}
+                            className="text-destructive"
+                          >
+                            Delete
+                          </DropdownMenuItem>
+                        )}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>
@@ -193,14 +255,20 @@ export function ExpenseTypeTable() {
         </Table>
       </div>
 
-      { expenseTypes && expenseTypes.length > itemsPerPage && (
+      {expenseTypes && expenseTypes.length > itemsPerPage && (
         <div className="flex items-center justify-between">
           <p className="text-sm text-muted-foreground">
-            Showing {startIndex + 1} to {Math.min(startIndex + itemsPerPage, expenseTypes.length)} of{" "}
+            Showing {startIndex + 1} to{" "}
+            {Math.min(startIndex + itemsPerPage, expenseTypes.length)} of{" "}
             {expenseTypes.length} transfers
           </p>
           <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={() => setPage(Math.max(1, page - 1))} disabled={page === 1}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage(Math.max(1, page - 1))}
+              disabled={page === 1}
+            >
               <ChevronLeft className="h-4 w-4" />
             </Button>
             <div className="flex items-center gap-1">
@@ -228,7 +296,12 @@ export function ExpenseTypeTable() {
         </div>
       )}
 
-      <ExpenseTypeFormDialog expenseType={selectedExpenseType} open={isDialogOpen} onOpenChange={setIsDialogOpen} />
+      <ExpenseTypeFormDialog
+        expenseType={selectedExpenseType}
+        open={isDialogOpen}
+        onOpenChange={setIsDialogOpen}
+      />
+
       <ConfirmDeleteDialog
         open={!!expenseTypeToDelete}
         onOpenChange={(open) => !open && setExpenseTypeToDelete(null)}

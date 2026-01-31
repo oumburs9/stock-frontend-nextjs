@@ -11,26 +11,30 @@ import { Badge } from "@/components/ui/badge"
 import { format } from "date-fns"
 import { useToast } from "@/hooks/use-toast"
 import type { CommissionRule } from "@/lib/types/agent-sales"
+import type { AxiosError } from "axios"
+import { parseApiError } from "@/lib/api/parse-api-error"
+import { showApiErrorToast } from "@/lib/api/show-api-error-toast"
+import { ConfirmDeleteDialog } from "@/components/shared/confirm-delete-dialog"
 
 export function CommissionRuleTable() {
-  const { toast } = useToast()
+  const toast = useToast()
   const { data: rules, isLoading } = useCommissionRules()
   const deleteMutation = useDeleteCommissionRule()
   const [editingRule, setEditingRule] = useState<CommissionRule | null>(null)
+  const [ruleToDelete, setRuleToDelete] = useState<CommissionRule | null>(null)
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this commission rule?")) return
+  const confirmDelete = () => {
+    if (!ruleToDelete) return
 
-    try {
-      await deleteMutation.mutateAsync(id)
-      toast({ title: "Rule deleted", description: "Commission rule deleted successfully" })
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to delete rule",
-        variant: "destructive",
-      })
-    }
+    deleteMutation.mutate(ruleToDelete.id, {
+      onSuccess: () => {
+        toast.success("Rule deleted", "Commission rule deleted successfully")
+        setRuleToDelete(null)
+      },
+      onError: (e: AxiosError) => {
+        showApiErrorToast(parseApiError(e), toast, "Failed to delete rule")
+      },
+    })
   }
 
   if (isLoading) return <div>Loading commission rules...</div>
@@ -58,7 +62,7 @@ export function CommissionRuleTable() {
               </TableCell>
               <TableCell>
                 {rule.is_active ? (
-                  <Badge variant="success" className="gap-1">
+                  <Badge variant="default" className="gap-1">
                     <CheckCircle className="h-3 w-3" /> Active
                   </Badge>
                 ) : (
@@ -82,7 +86,10 @@ export function CommissionRuleTable() {
                     <DropdownMenuItem onClick={() => setEditingRule(rule)}>
                       <Edit className="h-4 w-4 mr-2" /> Edit
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => handleDelete(rule.id)} className="text-destructive">
+                    <DropdownMenuItem
+                      onClick={() => setRuleToDelete(rule)}
+                      className="text-destructive"
+                    >
                       <Trash2 className="h-4 w-4 mr-2" /> Delete
                     </DropdownMenuItem>
                   </DropdownMenuContent>
@@ -104,6 +111,15 @@ export function CommissionRuleTable() {
         open={!!editingRule}
         onOpenChange={(open) => !open && setEditingRule(null)}
         rule={editingRule}
+      />
+
+      <ConfirmDeleteDialog
+        open={!!ruleToDelete}
+        onOpenChange={(open) => !open && setRuleToDelete(null)}
+        onConfirm={confirmDelete}
+        title="Delete Commission Rule"
+        description="Are you sure you want to delete this commission rule?"
+        itemName={ruleToDelete?.name}
       />
     </div>
   )

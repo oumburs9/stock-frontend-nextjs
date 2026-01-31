@@ -1,9 +1,13 @@
 "use client"
 
 import { useState } from "react"
+import type { AxiosError } from "axios"
 import { MoreHorizontal, Plus, Search, Settings } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useAttributeSets, useDeleteAttributeSet } from "@/lib/hooks/use-attribute-sets"
+import { parseApiError } from "@/lib/api/parse-api-error"
+import { showApiErrorToast } from "@/lib/api/show-api-error-toast"
+import { useToast } from "@/hooks/use-toast"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -28,25 +32,28 @@ export function AttributeSetTable() {
   const [setToDelete, setSetToDelete] = useState<AttributeSet | null>(null)
 
   const { hasPermission } = useAuth()
+  const { success, error: errorToast, warning } = useToast()
+
   const { data: sets, isLoading } = useAttributeSets()
   const deleteMutation = useDeleteAttributeSet()
 
-  const filteredSets = sets?.filter((set) => set.name.toLowerCase().includes(search.toLowerCase()))
-
-  const handleEdit = (set: AttributeSet) => {
-    setSelectedSet(set)
-    setIsDialogOpen(true)
-  }
-
-  const handleDelete = (set: AttributeSet) => {
-    setSetToDelete(set)
-  }
+  const filteredSets = sets?.filter((set) =>
+    set.name.toLowerCase().includes(search.toLowerCase()),
+  )
 
   const confirmDelete = () => {
-    if (setToDelete) {
-      deleteMutation.mutate(setToDelete.id)
-      setSetToDelete(null)
-    }
+    if (!setToDelete) return
+
+    deleteMutation.mutate(setToDelete.id, {
+      onSuccess: () => {
+        success("Attribute set deleted", "The attribute set was deleted successfully.")
+        setSetToDelete(null)
+      },
+      onError: (e: AxiosError) => {
+        const parsed = parseApiError(e)
+        showApiErrorToast(parsed, { error: errorToast, warning }, "Failed to delete attribute set.")
+      },
+    })
   }
 
   const handleManageAttributes = (id: string) => {
@@ -66,15 +73,11 @@ export function AttributeSetTable() {
           />
         </div>
         {hasPermission("attribute-set:create") && (
-          <Button
-            onClick={() => {
-              setSelectedSet(null)
-              setIsDialogOpen(true)
-            }}
-          >
+          <Button onClick={() => { setSelectedSet(null); setIsDialogOpen(true) }}>
             <Plus className="h-4 w-4 mr-2" />
             Add Attribute Set
-          </Button>)}
+          </Button>
+        )}
       </div>
 
       <div className="rounded-md border">
@@ -83,7 +86,7 @@ export function AttributeSetTable() {
             <TableRow>
               <TableHead>Name</TableHead>
               <TableHead>Attributes</TableHead>
-              <TableHead className="w-[70px]"></TableHead>
+              <TableHead className="w-[70px]" />
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -104,7 +107,9 @@ export function AttributeSetTable() {
                 <TableRow key={set.id}>
                   <TableCell className="font-medium">{set.name}</TableCell>
                   <TableCell>
-                    <span className="px-2 py-1 bg-muted rounded text-xs">{set.items?.length || 0} attribute(s)</span>
+                    <span className="px-2 py-1 bg-muted rounded text-xs">
+                      {set.items?.length || 0} attribute(s)
+                    </span>
                   </TableCell>
                   <TableCell>
                     <DropdownMenu>
@@ -116,15 +121,26 @@ export function AttributeSetTable() {
                       <DropdownMenuContent align="end">
                         <DropdownMenuLabel>Actions</DropdownMenuLabel>
                         <DropdownMenuSeparator />
-                        {hasPermission("attribute-set:view") && (<DropdownMenuItem onClick={() => handleManageAttributes(set.id)}>
-                          <Settings className="h-4 w-4 mr-2" />
-                          Manage Attributes
-                        </DropdownMenuItem>)}
-                        {hasPermission("attribute-set:update") && (<DropdownMenuItem onClick={() => handleEdit(set)}>Edit Name</DropdownMenuItem>)}
+                        {hasPermission("attribute-set:view") && (
+                          <DropdownMenuItem onClick={() => handleManageAttributes(set.id)}>
+                            <Settings className="h-4 w-4 mr-2" />
+                            Manage Attributes
+                          </DropdownMenuItem>
+                        )}
+                        {hasPermission("attribute-set:update") && (
+                          <DropdownMenuItem onClick={() => { setSelectedSet(set); setIsDialogOpen(true) }}>
+                            Edit Name
+                          </DropdownMenuItem>
+                        )}
                         <DropdownMenuSeparator />
-                        {hasPermission("attribute-set:delete") && (<DropdownMenuItem onClick={() => handleDelete(set)} className="text-destructive">
-                          Delete
-                        </DropdownMenuItem>)}
+                        {hasPermission("attribute-set:delete") && (
+                          <DropdownMenuItem
+                            onClick={() => setSetToDelete(set)}
+                            className="text-destructive"
+                          >
+                            Delete
+                          </DropdownMenuItem>
+                        )}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>

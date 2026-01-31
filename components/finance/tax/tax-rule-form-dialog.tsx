@@ -1,8 +1,12 @@
 "use client"
 
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 import { useForm } from "react-hook-form"
+import type { AxiosError } from "axios"
 import { useCreateTaxRule, useUpdateTaxRule } from "@/lib/hooks/use-finance"
+import { parseApiError } from "@/lib/api/parse-api-error"
+import { showApiErrorToast } from "@/lib/api/show-api-error-toast"
+import { useToast } from "@/hooks/use-toast"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
@@ -19,6 +23,7 @@ interface TaxRuleFormDialogProps {
 export function TaxRuleFormDialog({ taxRule, open, onOpenChange }: TaxRuleFormDialogProps) {
   const createMutation = useCreateTaxRule()
   const updateMutation = useUpdateTaxRule()
+  const toast = useToast()
 
   const {
     register,
@@ -26,6 +31,7 @@ export function TaxRuleFormDialog({ taxRule, open, onOpenChange }: TaxRuleFormDi
     reset,
     watch,
     setValue,
+    setError,
     formState: { errors },
   } = useForm<CreateTaxRuleRequest>({
     defaultValues: {
@@ -37,7 +43,11 @@ export function TaxRuleFormDialog({ taxRule, open, onOpenChange }: TaxRuleFormDi
     },
   })
 
+  const [formError, setFormError] = useState<string | null>(null)
+
   useEffect(() => {
+    setFormError(null)
+
     if (taxRule) {
       reset({
         name: taxRule.name,
@@ -57,17 +67,37 @@ export function TaxRuleFormDialog({ taxRule, open, onOpenChange }: TaxRuleFormDi
     }
   }, [taxRule, open, reset])
 
-  const onSubmit = async (data: CreateTaxRuleRequest) => {
-    if (taxRule) {
-      await updateMutation.mutateAsync({
-        id: taxRule.id,
-        data,
+  const onSubmit = (data: CreateTaxRuleRequest) => {
+    setFormError(null)
+
+    const action = taxRule
+      ? updateMutation.mutateAsync({
+          id: taxRule.id,
+          data,
+        })
+      : createMutation.mutateAsync(data)
+
+    action
+      .then(() => {
+        toast.success(taxRule ? "Tax rule updated" : "Tax rule created")
+        onOpenChange(false)
       })
-    } else {
-      await createMutation.mutateAsync(data)
-    }
-    onOpenChange(false)
+      .catch((e: AxiosError) => {
+        const parsed = parseApiError(e)
+
+        if (parsed.type === "validation") {
+          Object.entries(parsed.fieldErrors).forEach(([field, message]) => {
+            setError(field as keyof CreateTaxRuleRequest, { message })
+          })
+          if (parsed.formError) setFormError(parsed.formError)
+          return
+        }
+
+        showApiErrorToast(parsed, toast)
+      })
   }
+
+  const isPending = createMutation.isPending || updateMutation.isPending
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -75,27 +105,24 @@ export function TaxRuleFormDialog({ taxRule, open, onOpenChange }: TaxRuleFormDi
         <DialogHeader>
           <DialogTitle>{taxRule ? "Edit Tax Rule" : "Create Tax Rule"}</DialogTitle>
         </DialogHeader>
+
+        {formError && (
+          <div className="rounded-md border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">
+            {formError}
+          </div>
+        )}
+
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="name">Name *</Label>
-            <Input id="name" {...register("name", { required: "Name is required" })} placeholder="VAT 15%" />
-            {errors.name && <p className="text-sm text-destructive">{errors.name.message}</p>}
+            <Input id="name" {...register("name")} placeholder="VAT 15%" />
+            {errors.name?.message && <p className="text-sm text-destructive">{errors.name.message}</p>}
           </div>
 
           <div className="space-y-2">
             <Label htmlFor="rate">Rate (%) *</Label>
-            <Input
-              id="rate"
-              type="number"
-              step="0.01"
-              {...register("rate", {
-                required: "Rate is required",
-                min: { value: 0, message: "Rate must be 0 or more" },
-                max: { value: 100, message: "Rate must be 100 or less" },
-              })}
-              placeholder="15.00"
-            />
-            {errors.rate && <p className="text-sm text-destructive">{errors.rate.message}</p>}
+            <Input id="rate" type="number" step="0.01" {...register("rate")} placeholder="15.00" />
+            {errors.rate?.message && <p className="text-sm text-destructive">{errors.rate.message}</p>}
           </div>
 
           <div className="flex items-center justify-between space-x-2">
@@ -113,11 +140,15 @@ export function TaxRuleFormDialog({ taxRule, open, onOpenChange }: TaxRuleFormDi
             <div className="space-y-2">
               <Label htmlFor="validFrom">Valid From</Label>
               <Input id="validFrom" type="date" {...register("validFrom")} />
+              {errors.validFrom?.message && (
+                <p className="text-sm text-destructive">{errors.validFrom.message}</p>
+              )}
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="validTo">Valid To</Label>
               <Input id="validTo" type="date" {...register("validTo")} />
+              {errors.validTo?.message && <p className="text-sm text-destructive">{errors.validTo.message}</p>}
             </div>
           </div>
 
@@ -125,8 +156,8 @@ export function TaxRuleFormDialog({ taxRule, open, onOpenChange }: TaxRuleFormDi
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending}>
-              {createMutation.isPending || updateMutation.isPending ? "Saving..." : "Save"}
+            <Button type="submit" disabled={isPending}>
+              {isPending ? "Saving..." : "Save"}
             </Button>
           </DialogFooter>
         </form>

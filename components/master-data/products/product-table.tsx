@@ -1,11 +1,15 @@
 "use client"
 
 import { useState } from "react"
+import type { AxiosError } from "axios"
 import { MoreHorizontal, Plus, Search, Eye, X, ChevronLeft, ChevronRight } from "lucide-react"
 import { useProducts, useDeleteProduct } from "@/lib/hooks/use-products"
 import { useCategories } from "@/lib/hooks/use-categories"
 import { useBrands } from "@/lib/hooks/use-brands"
 import { useUnits } from "@/lib/hooks/use-units"
+import { parseApiError } from "@/lib/api/parse-api-error"
+import { showApiErrorToast } from "@/lib/api/show-api-error-toast"
+import { useToast } from "@/hooks/use-toast"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -22,6 +26,7 @@ import { ConfirmDeleteDialog } from "@/components/shared/confirm-delete-dialog"
 import { useRouter } from "next/navigation"
 import type { Product } from "@/lib/types/master-data"
 import { useAuth } from "@/lib/hooks/use-auth"
+import { formatCurrency } from "@/lib/utils/currency"
 
 export function ProductTable() {
   const [search, setSearch] = useState("")
@@ -32,18 +37,22 @@ export function ProductTable() {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [productToDelete, setProductToDelete] = useState<Product | null>(null)
-  const router = useRouter()
 
-  const { hasPermission } =  useAuth()
+  const router = useRouter()
+  const { hasPermission } = useAuth()
+  const { success, error: errorToast, warning } = useToast()
+
   const { data: products, isLoading } = useProducts({
     search,
     category_id: categoryFilter,
     brand_id: brandFilter,
     unit_id: unitFilter,
   })
+
   const { data: categories } = useCategories()
   const { data: brands } = useBrands()
   const { data: units } = useUnits()
+
   const deleteMutation = useDeleteProduct()
 
   const handleEdit = (product: Product) => {
@@ -56,18 +65,23 @@ export function ProductTable() {
   }
 
   const confirmDelete = () => {
-    if (productToDelete) {
-      deleteMutation.mutate(productToDelete.id)
-    }
+    if (!productToDelete) return
+
+    deleteMutation.mutate(productToDelete.id, {
+      onSuccess: () => {
+        success("Product deleted", "The product was deleted successfully.")
+        setProductToDelete(null)
+      },
+      onError: (e: AxiosError) => {
+        const parsed = parseApiError(e)
+        showApiErrorToast(parsed, { error: errorToast, warning }, "Failed to delete product.")
+      },
+    })
   }
 
   const handleViewDetails = (id: string) => {
     router.push(`/master-data/products/${id}`)
   }
-
-  const selectedCategory = categories?.find((c) => c.id === categoryFilter)
-  const selectedBrand = brands?.find((b) => b.id === brandFilter)
-  const selectedUnit = units?.find((u) => u.id === unitFilter)
 
   const itemsPerPage = 10
   const startIndex = (page - 1) * itemsPerPage
@@ -82,7 +96,10 @@ export function ProductTable() {
           <Input
             placeholder="Search products..."
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => {
+              setSearch(e.target.value)
+              setPage(1)
+            }}
             className="pl-9"
           />
         </div>
@@ -95,20 +112,20 @@ export function ProductTable() {
           >
             <Plus className="h-4 w-4 mr-2" />
             Add Product
-          </Button>)}
+          </Button>
+        )}
       </div>
 
       <div className="flex gap-2 flex-wrap items-center">
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-muted-foreground">Filters:</span>
-        </div>
+        <span className="text-sm text-muted-foreground">Filters:</span>
+
         <select
           value={categoryFilter}
           onChange={(e) => {
             setCategoryFilter(e.target.value)
             setPage(1)
           }}
-          className="px-3 py-1 text-sm border border-input rounded-md bg-background text-foreground hover:bg-accent focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+          className="px-3 py-1 text-sm border border-input rounded-md bg-background text-foreground"
         >
           <option value="">All Categories</option>
           {categories?.map((cat) => (
@@ -117,13 +134,14 @@ export function ProductTable() {
             </option>
           ))}
         </select>
+
         <select
           value={brandFilter}
           onChange={(e) => {
             setBrandFilter(e.target.value)
             setPage(1)
           }}
-          className="px-3 py-1 text-sm border border-input rounded-md bg-background text-foreground hover:bg-accent focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+          className="px-3 py-1 text-sm border border-input rounded-md bg-background text-foreground"
         >
           <option value="">All Brands</option>
           {brands?.map((brand) => (
@@ -132,13 +150,14 @@ export function ProductTable() {
             </option>
           ))}
         </select>
+
         <select
           value={unitFilter}
           onChange={(e) => {
             setUnitFilter(e.target.value)
             setPage(1)
           }}
-          className="px-3 py-1 text-sm border border-input rounded-md bg-background text-foreground hover:bg-accent focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+          className="px-3 py-1 text-sm border border-input rounded-md bg-background text-foreground"
         >
           <option value="">All Units</option>
           {units?.map((unit) => (
@@ -147,6 +166,7 @@ export function ProductTable() {
             </option>
           ))}
         </select>
+
         {(categoryFilter || brandFilter || unitFilter) && (
           <Button
             size="sm"
@@ -174,7 +194,7 @@ export function ProductTable() {
               <TableHead>Brand</TableHead>
               <TableHead>Unit</TableHead>
               <TableHead className="text-right">Base Price</TableHead>
-              <TableHead className="w-[70px]"></TableHead>
+              <TableHead className="w-[70px]" />
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -191,15 +211,18 @@ export function ProductTable() {
                 </TableCell>
               </TableRow>
             ) : (
-              paginatedProducts?.map((product: any) => (
-                
+              paginatedProducts?.map((product) => (
                 <TableRow key={product.id}>
                   <TableCell className="font-mono text-sm">{product.sku}</TableCell>
                   <TableCell className="font-medium">{product.name}</TableCell>
-                  <TableCell className="text-muted-foreground">{product?.category.name || "-"}</TableCell>
-                  <TableCell>{product.brand?.name|| "-"}</TableCell>
+                  <TableCell>{product.category?.name || "-"}</TableCell>
+                  <TableCell>{product.brand?.name || "-"}</TableCell>
                   <TableCell>{product.unit?.name || "-"}</TableCell>
-                  <TableCell className="text-right font-mono">{ product.base_price ? `ETB ${Number(product.base_price).toFixed(2)}` : "0.00"}</TableCell>
+                  <TableCell className="text-right font-mono">
+                    {/* {product.base_price ? `ETB ${Number(product.base_price).toFixed(2)}` : "0.00"} */}
+                    {formatCurrency(Number(product.base_price ?? 0), 'ETB')}
+
+                  </TableCell>
                   <TableCell>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
@@ -210,15 +233,26 @@ export function ProductTable() {
                       <DropdownMenuContent align="end">
                         <DropdownMenuLabel>Actions</DropdownMenuLabel>
                         <DropdownMenuSeparator />
-                        {hasPermission("product:view") && (<DropdownMenuItem onClick={() => handleViewDetails(product.id)}>
-                          <Eye className="h-4 w-4 mr-2" />
-                          View Details
-                        </DropdownMenuItem>)}
-                        {hasPermission("product:update") && (<DropdownMenuItem onClick={() => handleEdit(product)}>Edit</DropdownMenuItem>)}
+                        {hasPermission("product:view") && (
+                          <DropdownMenuItem onClick={() => handleViewDetails(product.id)}>
+                            <Eye className="h-4 w-4 mr-2" />
+                            View Details
+                          </DropdownMenuItem>
+                        )}
+                        {hasPermission("product:update") && (
+                          <DropdownMenuItem onClick={() => handleEdit(product)}>
+                            Edit
+                          </DropdownMenuItem>
+                        )}
                         <DropdownMenuSeparator />
-                        {hasPermission("product:delete") && (<DropdownMenuItem onClick={() => handleDelete(product)} className="text-destructive">
-                          Delete
-                        </DropdownMenuItem>)}
+                        {hasPermission("product:delete") && (
+                          <DropdownMenuItem
+                            onClick={() => handleDelete(product)}
+                            className="text-destructive"
+                          >
+                            Delete
+                          </DropdownMenuItem>
+                        )}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>
@@ -232,11 +266,17 @@ export function ProductTable() {
       {products && products.length > itemsPerPage && (
         <div className="flex items-center justify-between">
           <p className="text-sm text-muted-foreground">
-            Showing {startIndex + 1} to {Math.min(startIndex + itemsPerPage, products.length)} of {products.length}{" "}
-            products
+            Showing {startIndex + 1} to{" "}
+            {Math.min(startIndex + itemsPerPage, products.length)} of{" "}
+            {products.length} products
           </p>
           <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={() => setPage(Math.max(1, page - 1))} disabled={page === 1}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage(Math.max(1, page - 1))}
+              disabled={page === 1}
+            >
               <ChevronLeft className="h-4 w-4" />
             </Button>
             <div className="flex items-center gap-1">
@@ -264,7 +304,12 @@ export function ProductTable() {
         </div>
       )}
 
-      <ProductFormDialog product={selectedProduct} open={isDialogOpen} onOpenChange={setIsDialogOpen} />
+      <ProductFormDialog
+        product={selectedProduct}
+        open={isDialogOpen}
+        onOpenChange={setIsDialogOpen}
+      />
+
       <ConfirmDeleteDialog
         open={!!productToDelete}
         onOpenChange={(open) => !open && setProductToDelete(null)}

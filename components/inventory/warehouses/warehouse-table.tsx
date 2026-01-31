@@ -19,6 +19,10 @@ import { ConfirmDeleteDialog } from "@/components/shared/confirm-delete-dialog"
 import type { Warehouse } from "@/lib/types/inventory"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/lib/hooks/use-auth"
+import type { AxiosError } from "axios"
+import { parseApiError } from "@/lib/api/parse-api-error"
+import { showApiErrorToast } from "@/lib/api/show-api-error-toast"
+import { useToast } from "@/hooks/use-toast"
 
 export function WarehouseTable() {
   const [search, setSearch] = useState("")
@@ -26,15 +30,17 @@ export function WarehouseTable() {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [warehouseToDelete, setWarehouseToDelete] = useState<Warehouse | null>(null)
   const [page, setPage] = useState(1)
-  const router = useRouter()
 
+  const router = useRouter()
+  const toast = useToast()
   const { hasPermission } = useAuth()
   const { data: warehouses, isLoading } = useWarehouses()
   const deleteMutation = useDeleteWarehouse()
 
   const filteredWarehouses = warehouses?.filter(
     (w) =>
-      w.name.toLowerCase().includes(search.toLowerCase()) || w.address.toLowerCase().includes(search.toLowerCase()),
+      w.name.toLowerCase().includes(search.toLowerCase()) ||
+      w.address.toLowerCase().includes(search.toLowerCase()),
   )
 
   const itemsPerPage = 10
@@ -52,14 +58,19 @@ export function WarehouseTable() {
   }
 
   const confirmDelete = () => {
-    if (warehouseToDelete) {
-      deleteMutation.mutate(warehouseToDelete.id)
-    }
+    if (!warehouseToDelete) return
+
+    deleteMutation.mutate(warehouseToDelete.id, {
+      onSuccess: () => {
+        toast.success("Warehouse deleted", "The warehouse was deleted successfully.")
+        setWarehouseToDelete(null)
+      },
+      onError: (e: AxiosError) =>
+        showApiErrorToast(parseApiError(e), toast, "Failed to delete warehouse."),
+    })
   }
 
   const handleViewDetails = (warehouseId: string) => {
-    setSelectedWarehouse(warehouses?.find((w) => w.id === warehouseId) || null)
-    // Navigate to detail page
     router.push(`/inventory/warehouses/${warehouseId}`)
   }
 
@@ -87,7 +98,8 @@ export function WarehouseTable() {
           >
             <Plus className="h-4 w-4 mr-2" />
             Add Warehouse
-          </Button>)}
+          </Button>
+        )}
       </div>
 
       <div className="rounded-md border">
@@ -122,7 +134,9 @@ export function WarehouseTable() {
                 >
                   <TableCell className="font-medium">{warehouse.name}</TableCell>
                   <TableCell>{warehouse.address}</TableCell>
-                  <TableCell className="text-sm text-muted-foreground">{warehouse.description}</TableCell>
+                  <TableCell className="text-sm text-muted-foreground">
+                    {warehouse.description}
+                  </TableCell>
                   <TableCell onClick={(e) => e.stopPropagation()}>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
@@ -133,14 +147,25 @@ export function WarehouseTable() {
                       <DropdownMenuContent align="end">
                         <DropdownMenuLabel>Actions</DropdownMenuLabel>
                         <DropdownMenuSeparator />
-                        {hasPermission("warehouse:update") && (<DropdownMenuItem onClick={() => handleEdit(warehouse)}>Edit</DropdownMenuItem>)}
-                        {hasPermission("warehouse:view") && (<DropdownMenuItem onClick={() => handleViewDetails(warehouse.id)}>
-                          View Details
-                        </DropdownMenuItem>)}
+                        {hasPermission("warehouse:update") && (
+                          <DropdownMenuItem onClick={() => handleEdit(warehouse)}>
+                            Edit
+                          </DropdownMenuItem>
+                        )}
+                        {hasPermission("warehouse:view") && (
+                          <DropdownMenuItem onClick={() => handleViewDetails(warehouse.id)}>
+                            View Details
+                          </DropdownMenuItem>
+                        )}
                         <DropdownMenuSeparator />
-                        {hasPermission("warehouse:delete") && (<DropdownMenuItem onClick={() => handleDelete(warehouse)} className="text-destructive">
-                          Delete
-                        </DropdownMenuItem>)}
+                        {hasPermission("warehouse:delete") && (
+                          <DropdownMenuItem
+                            onClick={() => handleDelete(warehouse)}
+                            className="text-destructive"
+                          >
+                            Delete
+                          </DropdownMenuItem>
+                        )}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>
@@ -154,11 +179,17 @@ export function WarehouseTable() {
       {filteredWarehouses && filteredWarehouses.length > itemsPerPage && (
         <div className="flex items-center justify-between">
           <p className="text-sm text-muted-foreground">
-            Showing {startIndex + 1} to {Math.min(startIndex + itemsPerPage, filteredWarehouses.length)} of{" "}
+            Showing {startIndex + 1} to{" "}
+            {Math.min(startIndex + itemsPerPage, filteredWarehouses.length)} of{" "}
             {filteredWarehouses.length} warehouses
           </p>
           <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={() => setPage(Math.max(1, page - 1))} disabled={page === 1}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage(Math.max(1, page - 1))}
+              disabled={page === 1}
+            >
               <ChevronLeft className="h-4 w-4" />
             </Button>
             <div className="flex items-center gap-1">
@@ -186,7 +217,12 @@ export function WarehouseTable() {
         </div>
       )}
 
-      <WarehouseFormDialog warehouse={selectedWarehouse} open={isDialogOpen} onOpenChange={setIsDialogOpen} />
+      <WarehouseFormDialog
+        warehouse={selectedWarehouse}
+        open={isDialogOpen}
+        onOpenChange={setIsDialogOpen}
+      />
+
       <ConfirmDeleteDialog
         open={!!warehouseToDelete}
         onOpenChange={(open) => !open && setWarehouseToDelete(null)}

@@ -1,8 +1,12 @@
 "use client"
 
 import { useState } from "react"
+import type { AxiosError } from "axios"
 import { MoreHorizontal, Plus, Search, ChevronLeft, ChevronRight } from "lucide-react"
 import { useAttributes, useDeleteAttribute } from "@/lib/hooks/use-attributes"
+import { parseApiError } from "@/lib/api/parse-api-error"
+import { showApiErrorToast } from "@/lib/api/show-api-error-toast"
+import { useToast } from "@/hooks/use-toast"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -28,6 +32,8 @@ export function AttributeTable() {
   const [page, setPage] = useState(1)
 
   const { hasPermission } = useAuth()
+  const { success, error: errorToast, warning } = useToast()
+
   const { data: attributes, isLoading } = useAttributes()
   const deleteMutation = useDeleteAttribute()
 
@@ -37,19 +43,19 @@ export function AttributeTable() {
       attribute.label.toLowerCase().includes(search.toLowerCase()),
   )
 
-  const handleEdit = (attribute: Attribute) => {
-    setSelectedAttribute(attribute)
-    setIsDialogOpen(true)
-  }
-
-  const handleDelete = (attribute: Attribute) => {
-    setAttributeToDelete(attribute)
-  }
-
   const confirmDelete = () => {
-    if (attributeToDelete) {
-      deleteMutation.mutate(attributeToDelete.id)
-    }
+    if (!attributeToDelete) return
+
+    deleteMutation.mutate(attributeToDelete.id, {
+      onSuccess: () => {
+        success("Attribute deleted", "The attribute was deleted successfully.")
+        setAttributeToDelete(null)
+      },
+      onError: (e: AxiosError) => {
+        const parsed = parseApiError(e)
+        showApiErrorToast(parsed, { error: errorToast, warning }, "Failed to delete attribute.")
+      },
+    })
   }
 
   const itemsPerPage = 10
@@ -73,15 +79,11 @@ export function AttributeTable() {
           />
         </div>
         {hasPermission("attribute:create") && (
-          <Button
-            onClick={() => {
-              setSelectedAttribute(null)
-              setIsDialogOpen(true)
-            }}
-          >
+          <Button onClick={() => { setSelectedAttribute(null); setIsDialogOpen(true) }}>
             <Plus className="h-4 w-4 mr-2" />
             Add Attribute
-          </Button>)}
+          </Button>
+        )}
       </div>
 
       <div className="rounded-md border">
@@ -92,7 +94,7 @@ export function AttributeTable() {
               <TableHead>Label</TableHead>
               <TableHead>Data Type</TableHead>
               <TableHead>Required</TableHead>
-              <TableHead className="w-[70px]"></TableHead>
+              <TableHead className="w-[70px]" />
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -113,9 +115,7 @@ export function AttributeTable() {
                 <TableRow key={attribute.id}>
                   <TableCell className="font-mono text-sm">{attribute.name}</TableCell>
                   <TableCell className="font-medium">{attribute.label}</TableCell>
-                  <TableCell>
-                    <Badge variant="secondary">{attribute.data_type}</Badge>
-                  </TableCell>
+                  <TableCell><Badge variant="secondary">{attribute.data_type}</Badge></TableCell>
                   <TableCell>{attribute.is_required ? "Yes" : "No"}</TableCell>
                   <TableCell>
                     <DropdownMenu>
@@ -127,11 +127,20 @@ export function AttributeTable() {
                       <DropdownMenuContent align="end">
                         <DropdownMenuLabel>Actions</DropdownMenuLabel>
                         <DropdownMenuSeparator />
-                        {hasPermission("attribute:update") && (<DropdownMenuItem onClick={() => handleEdit(attribute)}>Edit</DropdownMenuItem>)}
+                        {hasPermission("attribute:update") && (
+                          <DropdownMenuItem onClick={() => { setSelectedAttribute(attribute); setIsDialogOpen(true) }}>
+                            Edit
+                          </DropdownMenuItem>
+                        )}
                         <DropdownMenuSeparator />
-                        {hasPermission("attribute:delete") && (<DropdownMenuItem onClick={() => handleDelete(attribute)} className="text-destructive">
-                          Delete
-                        </DropdownMenuItem>)}
+                        {hasPermission("attribute:delete") && (
+                          <DropdownMenuItem
+                            onClick={() => setAttributeToDelete(attribute)}
+                            className="text-destructive"
+                          >
+                            Delete
+                          </DropdownMenuItem>
+                        )}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>
@@ -152,19 +161,17 @@ export function AttributeTable() {
             <Button variant="outline" size="sm" onClick={() => setPage(Math.max(1, page - 1))} disabled={page === 1}>
               <ChevronLeft className="h-4 w-4" />
             </Button>
-            <div className="flex items-center gap-1">
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
-                <Button
-                  key={p}
-                  variant={page === p ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setPage(p)}
-                  className="w-8 h-8 p-0"
-                >
-                  {p}
-                </Button>
-              ))}
-            </div>
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+              <Button
+                key={p}
+                variant={page === p ? "default" : "outline"}
+                size="sm"
+                onClick={() => setPage(p)}
+                className="w-8 h-8 p-0"
+              >
+                {p}
+              </Button>
+            ))}
             <Button
               variant="outline"
               size="sm"

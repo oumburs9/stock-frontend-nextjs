@@ -1,9 +1,13 @@
 "use client"
 
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 import { useForm } from "react-hook-form"
+import type { AxiosError } from "axios"
 import { useCreatePayablePayment } from "@/lib/hooks/use-finance"
 import { usePaymentSources } from "@/lib/hooks/use-payment-sources"
+import { parseApiError } from "@/lib/api/parse-api-error"
+import { showApiErrorToast } from "@/lib/api/show-api-error-toast"
+import { useToast } from "@/hooks/use-toast"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
@@ -19,6 +23,7 @@ interface RecordPayablePaymentDialogProps {
 }
 
 export function RecordPayablePaymentDialog({ open, payable, onOpenChange }: RecordPayablePaymentDialogProps) {
+  const toast = useToast()
   const createMutation = useCreatePayablePayment()
   const { data: paymentSources = [] } = usePaymentSources()
   const { hasPermission } = useAuth()
@@ -29,6 +34,7 @@ export function RecordPayablePaymentDialog({ open, payable, onOpenChange }: Reco
     reset,
     watch,
     setValue,
+    setError,
     formState: { errors },
   } = useForm<CreatePayablePaymentRequest>({
     defaultValues: {
@@ -41,7 +47,11 @@ export function RecordPayablePaymentDialog({ open, payable, onOpenChange }: Reco
     },
   })
 
+  const [formError, setFormError] = useState<string | null>(null)
+
   useEffect(() => {
+    setFormError(null)
+
     if (payable && open) {
       reset({
         payableId: payable.id,
@@ -54,10 +64,30 @@ export function RecordPayablePaymentDialog({ open, payable, onOpenChange }: Reco
     }
   }, [payable, open, reset])
 
-  const onSubmit = async (data: CreatePayablePaymentRequest) => {
+  const onSubmit = (data: CreatePayablePaymentRequest) => {
     if (!hasPermission("payable:record-payment")) return
-    await createMutation.mutateAsync(data)
-    onOpenChange(false)
+
+    setFormError(null)
+
+    createMutation
+      .mutateAsync(data)
+      .then(() => {
+        toast.success("Payment recorded")
+        onOpenChange(false)
+      })
+      .catch((e: AxiosError) => {
+        const parsed = parseApiError(e)
+
+        if (parsed.type === "validation") {
+          Object.entries(parsed.fieldErrors).forEach(([field, message]) => {
+            setError(field as keyof CreatePayablePaymentRequest, { message })
+          })
+          if (parsed.formError) setFormError(parsed.formError)
+          return
+        }
+
+        showApiErrorToast(parsed, toast)
+      })
   }
 
   const activePaymentSources = paymentSources.filter((ps) => ps.is_active)
@@ -68,6 +98,13 @@ export function RecordPayablePaymentDialog({ open, payable, onOpenChange }: Reco
         <DialogHeader>
           <DialogTitle>Record Payable Payment</DialogTitle>
         </DialogHeader>
+
+        {formError && (
+          <div className="rounded-md border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">
+            {formError}
+          </div>
+        )}
+
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="space-y-2">
             <Label>Balance Due</Label>
@@ -79,26 +116,16 @@ export function RecordPayablePaymentDialog({ open, payable, onOpenChange }: Reco
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="paymentDate">Payment Date *</Label>
-              <Input
-                id="paymentDate"
-                type="date"
-                {...register("paymentDate", { required: "Payment date is required" })}
-              />
-              {errors.paymentDate && <p className="text-sm text-destructive">{errors.paymentDate.message}</p>}
+              <Input id="paymentDate" type="date" {...register("paymentDate")} />
+              {errors.paymentDate?.message && (
+                <p className="text-sm text-destructive">{errors.paymentDate.message}</p>
+              )}
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="amount">Amount *</Label>
-              <Input
-                id="amount"
-                type="number"
-                step="0.01"
-                {...register("amount", {
-                  required: "Amount is required",
-                  min: { value: 0.01, message: "Amount must be positive" },
-                })}
-              />
-              {errors.amount && <p className="text-sm text-destructive">{errors.amount.message}</p>}
+              <Input id="amount" type="number" step="0.01" {...register("amount")} />
+              {errors.amount?.message && <p className="text-sm text-destructive">{errors.amount.message}</p>}
             </div>
           </div>
 
@@ -115,6 +142,7 @@ export function RecordPayablePaymentDialog({ open, payable, onOpenChange }: Reco
                 <SelectItem value="mobile">Mobile Payment</SelectItem>
               </SelectContent>
             </Select>
+            {errors.method?.message && <p className="text-sm text-destructive">{errors.method.message}</p>}
           </div>
 
           <div className="space-y-2">
@@ -135,11 +163,17 @@ export function RecordPayablePaymentDialog({ open, payable, onOpenChange }: Reco
                 ))}
               </SelectContent>
             </Select>
+            {errors.paymentSourceId?.message && (
+              <p className="text-sm text-destructive">{errors.paymentSourceId.message}</p>
+            )}
           </div>
 
           <div className="space-y-2">
             <Label htmlFor="reference">Reference</Label>
             <Input id="reference" {...register("reference")} placeholder="Transaction reference..." />
+            {errors.reference?.message && (
+              <p className="text-sm text-destructive">{errors.reference.message}</p>
+            )}
           </div>
 
           <DialogFooter>

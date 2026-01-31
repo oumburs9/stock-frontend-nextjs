@@ -108,7 +108,7 @@ export function PayableTable({ searchQuery, statusFilter }: PayableTableProps) {
                   <TableRow key={payable.id}>
                     <TableCell>{getSupplierName(payable.supplier_id)}</TableCell>
                     <TableCell className="text-sm text-muted-foreground">
-                      {payable.purchase_order_id ? "Purchase Order" : payable.purchase_shipment_id ? "Shipment" : "-"}
+                      {payable.purchase_order_id ? "Purchase Order" : payable.purchase_shipment_id ? "Shipment" : "Agent Sale"}
                     </TableCell>
                     <TableCell className="font-mono">
                       {payable.currency} {Number.parseFloat(payable.amount).toLocaleString()}

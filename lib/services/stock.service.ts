@@ -189,6 +189,13 @@ class StockService {
     return response.data
   }
 
+  async getTransfers(): Promise<StockTransfer[]> {
+    const response = await axiosInstance.get<StockTransfer[]>("/stock-transactions", {
+      params: { direction: "transfer" },
+    })
+    return response.data
+  }
+
   async createAdjustment(data: CreateStockAdjustmentRequest): Promise<StockAdjustment> {
     const response = await axiosInstance.post<StockAdjustment>("/stock/adjust", data)
     return response.data

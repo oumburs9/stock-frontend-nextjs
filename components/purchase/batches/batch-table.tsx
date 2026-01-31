@@ -13,6 +13,7 @@ import { AddBatchExpenseDialog } from "./add-batch-expense-dialog"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/lib/hooks/use-auth"
+import { formatCurrency } from "@/lib/utils/currency"
 
 interface BatchTableProps {
   globalSearch: string
@@ -21,7 +22,12 @@ interface BatchTableProps {
   poFilter: string
 }
 
-export function BatchTable({ globalSearch, productFilter, shipmentFilter, poFilter }: BatchTableProps) {
+export function BatchTable({
+  globalSearch,
+  productFilter,
+  shipmentFilter,
+  poFilter,
+}: BatchTableProps) {
   const router = useRouter()
   const [selectedBatchId, setSelectedBatchId] = useState<string | null>(null)
   const [isExpenseDialogOpen, setIsExpenseDialogOpen] = useState(false)
@@ -35,35 +41,26 @@ export function BatchTable({ globalSearch, productFilter, shipmentFilter, poFilt
 
   const productMap = useMemo(() => {
     if (!products) return {}
-    return products.reduce(
-      (acc, p) => {
-        acc[p.id] = p.name
-        return acc
-      },
-      {} as Record<string, string>,
-    )
+    return products.reduce((acc, p) => {
+      acc[p.id] = p.name
+      return acc
+    }, {} as Record<string, string>)
   }, [products])
 
   const shipmentMap = useMemo(() => {
     if (!shipments?.data) return {}
-    return shipments.data.reduce(
-      (acc, s) => {
-        acc[s.id] = s.code
-        return acc
-      },
-      {} as Record<string, string>,
-    )
+    return shipments.data.reduce((acc, s) => {
+      acc[s.id] = s.code
+      return acc
+    }, {} as Record<string, string>)
   }, [shipments])
 
   const poMap = useMemo(() => {
     if (!purchaseOrders?.data) return {}
-    return purchaseOrders.data.reduce(
-      (acc, po) => {
-        acc[po.id] = po.code
-        return acc
-      },
-      {} as Record<string, string>,
-    )
+    return purchaseOrders.data.reduce((acc, po) => {
+      acc[po.id] = po.code
+      return acc
+    }, {} as Record<string, string>)
   }, [purchaseOrders])
 
   const filteredBatches = useMemo(() => {
@@ -71,38 +68,43 @@ export function BatchTable({ globalSearch, productFilter, shipmentFilter, poFilt
 
     let filtered = [...batches]
 
-    // Apply product filter
     if (productFilter) {
       filtered = filtered.filter((b) => b.product_id === productFilter)
     }
 
-    // Apply shipment filter
     if (shipmentFilter) {
       filtered = filtered.filter((b) => b.shipment_id === shipmentFilter)
     }
 
-    // Apply PO filter - Note: Batches don't directly link to PO, they link via shipment
-    // For PO-only batches (shipment_id is null), we can't filter by PO directly
-    // This is a limitation of the current API structure
     if (poFilter) {
-      // Filter to only batches that come from shipments linked to this PO
-      // This requires checking shipment items for purchase_order_item_id
-      // For now, we'll show batches with null shipment_id as "potentially from PO"
       filtered = filtered.filter((b) => b.shipment_id === null)
     }
 
-    // Apply global search
     if (globalSearch) {
       const search = globalSearch.toLowerCase()
       filtered = filtered.filter((b) => {
         const productName = productMap[b.product_id]?.toLowerCase() || ""
-        const shipmentCode = b.shipment_id ? shipmentMap[b.shipment_id]?.toLowerCase() || "" : ""
-        return productName.includes(search) || shipmentCode.includes(search) || "po only".includes(search)
+        const shipmentCode = b.shipment_id
+          ? shipmentMap[b.shipment_id]?.toLowerCase() || ""
+          : ""
+        return (
+          productName.includes(search) ||
+          shipmentCode.includes(search) ||
+          "po only".includes(search)
+        )
       })
     }
 
     return filtered
-  }, [batches, productFilter, shipmentFilter, poFilter, globalSearch, productMap, shipmentMap])
+  }, [
+    batches,
+    productFilter,
+    shipmentFilter,
+    poFilter,
+    globalSearch,
+    productMap,
+    shipmentMap,
+  ])
 
   const isLoading = batchesLoading || productsLoading
 
@@ -120,7 +122,9 @@ export function BatchTable({ globalSearch, productFilter, shipmentFilter, poFilt
     return (
       <Card>
         <CardContent className="flex items-center justify-center h-48">
-          <p className="text-muted-foreground">No batches found matching your filters</p>
+          <p className="text-muted-foreground">
+            No batches found matching your filters
+          </p>
         </CardContent>
       </Card>
     )
@@ -137,8 +141,11 @@ export function BatchTable({ globalSearch, productFilter, shipmentFilter, poFilt
 
   const itemsPerPage = 10
   const startIndex = (page - 1) * itemsPerPage
-  const paginatedTransfers = filteredBatches?.slice(startIndex, startIndex + itemsPerPage)
-  const totalPages = Math.ceil((filteredBatches?.length || 0) / itemsPerPage)
+  const paginatedTransfers = filteredBatches.slice(
+    startIndex,
+    startIndex + itemsPerPage,
+  )
+  const totalPages = Math.ceil(filteredBatches.length / itemsPerPage)
 
   return (
     <>
@@ -146,7 +153,8 @@ export function BatchTable({ globalSearch, productFilter, shipmentFilter, poFilt
         <CardHeader>
           <CardTitle>Batch List</CardTitle>
           <CardDescription>
-            Showing {filteredBatches.length} {filteredBatches.length === 1 ? "batch" : "batches"}
+            Showing {filteredBatches.length}{" "}
+            {filteredBatches.length === 1 ? "batch" : "batches"}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -166,27 +174,42 @@ export function BatchTable({ globalSearch, productFilter, shipmentFilter, poFilt
               </TableHeader>
               <TableBody>
                 {paginatedTransfers.map((batch) => {
-                  const productName = productMap[batch.product_id] || "Unknown Product"
-                  const source = batch.shipment_id ? shipmentMap[batch.shipment_id] || "Unknown" : "PO Only"
+                  const productName =
+                    productMap[batch.product_id] || "Unknown Product"
+                  const source = batch.shipment_id
+                    ? shipmentMap[batch.shipment_id] || "Unknown"
+                    : "PO Only"
 
                   return (
                     <TableRow key={batch.id}>
-                      <TableCell className="font-medium">{productName}</TableCell>
+                      <TableCell className="font-medium">
+                        {productName}
+                      </TableCell>
                       <TableCell>
                         {batch.shipment_id ? (
-                          <span className="text-sm">Shipment: {source}</span>
+                          <span className="text-sm">
+                            Shipment: {source}
+                          </span>
                         ) : (
-                          <span className="text-sm text-muted-foreground">Direct from PO</span>
+                          <span className="text-sm text-muted-foreground">
+                            Direct from PO
+                          </span>
                         )}
                       </TableCell>
-                      <TableCell>{new Date(batch.received_at).toLocaleDateString()}</TableCell>
-                      <TableCell className="text-right font-mono">{batch.quantity_received}</TableCell>
-                      <TableCell className="text-right font-mono font-medium">{batch.quantity_remaining}</TableCell>
+                      <TableCell>
+                        {new Date(batch.received_at).toLocaleDateString()}
+                      </TableCell>
                       <TableCell className="text-right font-mono">
-                        ETB {Number.parseFloat(batch.base_unit_cost).toFixed(2)}
+                        {batch.quantity_received}
+                      </TableCell>
+                      <TableCell className="text-right font-mono font-medium">
+                        {batch.quantity_remaining}
+                      </TableCell>
+                      <TableCell className="text-right font-mono">
+                        {formatCurrency(Number(batch.base_unit_cost ?? 0), 'ETB')}
                       </TableCell>
                       <TableCell className="text-right font-mono font-medium text-green-600 dark:text-green-400">
-                        ETB {Number.parseFloat(batch.landed_unit_cost).toFixed(2)}
+                        {formatCurrency(Number(batch.landed_unit_cost ?? 0), 'ETB')}
                       </TableCell>
                       <TableCell>
                         <DropdownMenu>
@@ -196,14 +219,26 @@ export function BatchTable({ globalSearch, productFilter, shipmentFilter, poFilt
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => handleViewDetails(batch.id)}>
+                            <DropdownMenuItem
+                              onClick={() =>
+                                handleViewDetails(batch.id)
+                              }
+                            >
                               <Eye className="mr-2 h-4 w-4" />
                               View Details
                             </DropdownMenuItem>
-                            {hasPermission("product-batch-expense:add") && (<DropdownMenuItem onClick={() => handleAddExpense(batch.id)}>
-                              <DollarSign className="mr-2 h-4 w-4" />
-                              Add Expense
-                            </DropdownMenuItem>)}
+                            {hasPermission(
+                              "product-batch-expense:add",
+                            ) && (
+                              <DropdownMenuItem
+                                onClick={() =>
+                                  handleAddExpense(batch.id)
+                                }
+                              >
+                                <DollarSign className="mr-2 h-4 w-4" />
+                                Add Expense
+                              </DropdownMenuItem>
+                            )}
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>
@@ -214,40 +249,53 @@ export function BatchTable({ globalSearch, productFilter, shipmentFilter, poFilt
             </Table>
           </div>
 
-        { filteredBatches && filteredBatches.length > itemsPerPage && (
-          <div className="flex items-center justify-between">
-            <p className="text-sm text-muted-foreground">
-              Showing {startIndex + 1} to {Math.min(startIndex + itemsPerPage, filteredBatches.length)} of{" "}
-              {filteredBatches.length} transfers
-            </p>
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={() => setPage(Math.max(1, page - 1))} disabled={page === 1}>
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <div className="flex items-center gap-1">
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
-                  <Button
-                    key={p}
-                    variant={page === p ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setPage(p)}
-                    className="w-8 h-8 p-0"
-                  >
-                    {p}
-                  </Button>
-                ))}
+          {filteredBatches.length > itemsPerPage && (
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-muted-foreground">
+                Showing {startIndex + 1} to{" "}
+                {Math.min(
+                  startIndex + itemsPerPage,
+                  filteredBatches.length,
+                )}{" "}
+                of {filteredBatches.length} transfers
+              </p>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage(Math.max(1, page - 1))}
+                  disabled={page === 1}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map(
+                    (p) => (
+                      <Button
+                        key={p}
+                        variant={page === p ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setPage(p)}
+                        className="w-8 h-8 p-0"
+                      >
+                        {p}
+                      </Button>
+                    ),
+                  )}
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    setPage(Math.min(totalPages, page + 1))
+                  }
+                  disabled={page === totalPages}
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
               </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setPage(Math.min(totalPages, page + 1))}
-                disabled={page === totalPages}
-              >
-                <ChevronRight className="h-4 w-4" />
-              </Button>
             </div>
-          </div>
-        )}
+          )}
 
           <div className="mt-4 p-4 bg-muted/50 rounded-lg space-y-2">
             <h4 className="font-medium text-sm">Cost Information</h4>
@@ -256,11 +304,12 @@ export function BatchTable({ globalSearch, productFilter, shipmentFilter, poFilt
                 <strong>Base Cost:</strong> Original unit cost when received
               </li>
               <li>
-                <strong>Landed Cost:</strong> Base cost + allocated batch expenses
+                <strong>Landed Cost:</strong> Base cost + allocated batch
+                expenses
               </li>
               <li>
-                <strong>Source:</strong> Batches from shipments show shipment code; direct PO receives show "Direct from
-                PO"
+                <strong>Source:</strong> Batches from shipments show shipment
+                code; direct PO receives show "Direct from PO"
               </li>
             </ul>
           </div>

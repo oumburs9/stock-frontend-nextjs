@@ -1,12 +1,19 @@
 "use client"
 
-import type React from "react"
-import { useState } from "react"
+import { useEffect } from "react"
+import { useForm } from "react-hook-form"
+import type { AxiosError } from "axios"
+
 import { useCreateStockTransfer } from "@/lib/hooks/use-stock-transfers"
 import { useProducts } from "@/lib/hooks/use-products"
 import { useWarehouses } from "@/lib/hooks/use-warehouses"
 import { useShops } from "@/lib/hooks/use-shops"
 import { useStockByLocation } from "@/lib/hooks/use-stock-by-location"
+
+import { parseApiError } from "@/lib/api/parse-api-error"
+import { showApiErrorToast } from "@/lib/api/show-api-error-toast"
+import { useToast } from "@/hooks/use-toast"
+
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -22,66 +29,103 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { SearchableSelect } from "@/components/shared/searchable-select"
 import { useAuth } from "@/lib/hooks/use-auth"
 
+type StockTransferFormValues = {
+  productId: string
+  fromLocationType: "warehouse" | "shop"
+  fromLocationId: string
+  toLocationType: "warehouse" | "shop"
+  toLocationId: string
+  quantity: string
+  reason: string
+}
+
 interface StockTransferFormDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
 }
 
 export function StockTransferFormDialog({ open, onOpenChange }: StockTransferFormDialogProps) {
-  const [formData, setFormData] = useState({
-    productId: "",
-    fromLocationType: "warehouse" as const,
-    fromLocationId: "",
-    toLocationType: "warehouse" as const,
-    toLocationId: "",
-    quantity: "",
-    reason: "",
-  })
-
+  const toast = useToast()
   const { hasPermission } = useAuth()
-  const { data: products } = useProducts()
+
+  const createMutation = useCreateStockTransfer()
   const { data: warehouses } = useWarehouses()
   const { data: shops } = useShops()
-  const { data: stockAtFromLocation } = useStockByLocation(formData.fromLocationType, formData.fromLocationId)
-  const createMutation = useCreateStockTransfer()
+
+  const {
+    register,
+    handleSubmit,
+    watch,
+    reset,
+    setError,
+    formState: { errors },
+  } = useForm<StockTransferFormValues>({
+    defaultValues: {
+      productId: "",
+      fromLocationType: "warehouse",
+      fromLocationId: "",
+      toLocationType: "warehouse",
+      toLocationId: "",
+      quantity: "",
+      reason: "",
+    },
+  })
+
+  useEffect(() => {
+    if (!open) {
+      reset({
+        productId: "",
+        fromLocationType: "warehouse",
+        fromLocationId: "",
+        toLocationType: "warehouse",
+        toLocationId: "",
+        quantity: "",
+        reason: "",
+      })
+    }
+  }, [open, reset])
+
+  const fromLocationType = watch("fromLocationType")
+  const fromLocationId = watch("fromLocationId")
+  const toLocationType = watch("toLocationType")
+
+  const { data: stockAtFromLocation } = useStockByLocation(fromLocationType, fromLocationId)
 
   const availableProducts =
     stockAtFromLocation?.map((stock) => ({
       id: stock.product.id,
-      name: `${stock.product.name} (${stock.product.sku}) - Available: ${stock.available}`,
+      name: `${stock.product.name} (${stock.product.sku})`,
       label: `${stock.product.name} - Available: ${stock.available}`,
     })) || []
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
+  const warehouseOptions =
+    warehouses?.map((w) => ({ id: w.id, name: w.name, label: w.name })) || []
 
-    createMutation.mutate(formData, {
-      onSuccess: () => {
+  const shopOptions =
+    shops?.map((s) => ({ id: s.id, name: s.name, label: s.name })) || []
+
+  const onSubmit = (values: StockTransferFormValues) => {
+    createMutation
+      .mutateAsync(values)
+      .then(() => {
+        toast.success("Stock transfer created")
         onOpenChange(false)
-        setFormData({
-          productId: "",
-          fromLocationType: "warehouse",
-          fromLocationId: "",
-          toLocationType: "warehouse",
-          toLocationId: "",
-          quantity: "",
-          reason: "",
-        })
-      },
-    })
+      })
+      .catch((e: AxiosError) => {
+        const parsed = parseApiError(e)
+
+        if (parsed.type === "validation") {
+          Object.entries(parsed.fieldErrors).forEach(([field, message]) => {
+            setError(field as keyof StockTransferFormValues, { message })
+          })
+          return
+        }
+
+        showApiErrorToast(parsed, toast)
+      })
   }
 
-  const warehouseOptions = (warehouses || []).map((w) => ({
-    id: w.id,
-    name: w.name,
-    label: w.name,
-  }))
-
-  const shopOptions = (shops || []).map((s) => ({
-    id: s.id,
-    name: s.name,
-    label: s.name,
-  }))
+  const isPending = createMutation.isPending
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -90,14 +134,15 @@ export function StockTransferFormDialog({ open, onOpenChange }: StockTransferFor
           <DialogTitle>Create Stock Transfer</DialogTitle>
           <DialogDescription>Move stock between warehouses and shops</DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
+
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="fromLocationType">From Location Type</Label>
+            <Label>From Location Type</Label>
             <Select
-              value={formData.fromLocationType}
+              value={fromLocationType}
               onValueChange={(value) =>
-                setFormData({
-                  ...formData,
+                reset({
+                  ...watch(),
                   fromLocationType: value as any,
                   fromLocationId: "",
                   productId: "",
@@ -115,42 +160,46 @@ export function StockTransferFormDialog({ open, onOpenChange }: StockTransferFor
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="fromLocationId">From Location</Label>
+            <Label>From Location</Label>
             <SearchableSelect
-              value={formData.fromLocationId}
+              value={fromLocationId}
               onValueChange={(value) =>
-                setFormData({
-                  ...formData,
-                  fromLocationId: value,
-                  productId: "",
-                })
+                reset({ ...watch(), fromLocationId: value, productId: "" })
               }
-              options={formData.fromLocationType === "warehouse" ? warehouseOptions : shopOptions}
+              options={fromLocationType === "warehouse" ? warehouseOptions : shopOptions}
               placeholder="Select location"
               searchPlaceholder="Search locations..."
             />
+            {errors.fromLocationId?.message && (
+              <p className="text-sm text-destructive">{errors.fromLocationId.message}</p>
+            )}
           </div>
 
-          {formData.fromLocationId && (
+          {fromLocationId && (
             <div className="space-y-2">
-              <Label htmlFor="productId">Product</Label>
+              <Label>Product</Label>
               <SearchableSelect
-                value={formData.productId}
-                onValueChange={(value) => setFormData({ ...formData, productId: value })}
+                value={watch("productId")}
+                onValueChange={(value) =>
+                  reset({ ...watch(), productId: value })
+                }
                 options={availableProducts}
                 placeholder="Select product"
                 searchPlaceholder="Search products..."
               />
+              {errors.productId?.message && (
+                <p className="text-sm text-destructive">{errors.productId.message}</p>
+              )}
             </div>
           )}
 
           <div className="space-y-2">
-            <Label htmlFor="toLocationType">To Location Type</Label>
+            <Label>To Location Type</Label>
             <Select
-              value={formData.toLocationType}
+              value={toLocationType}
               onValueChange={(value) =>
-                setFormData({
-                  ...formData,
+                reset({
+                  ...watch(),
                   toLocationType: value as any,
                   toLocationId: "",
                 })
@@ -167,31 +216,37 @@ export function StockTransferFormDialog({ open, onOpenChange }: StockTransferFor
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="toLocationId">To Location</Label>
+            <Label>To Location</Label>
             <SearchableSelect
-              value={formData.toLocationId}
-              onValueChange={(value) => setFormData({ ...formData, toLocationId: value })}
-              options={formData.toLocationType === "warehouse" ? warehouseOptions : shopOptions}
+              value={watch("toLocationId")}
+              onValueChange={(value) =>
+                reset({ ...watch(), toLocationId: value })
+              }
+              options={toLocationType === "warehouse" ? warehouseOptions : shopOptions}
               placeholder="Select location"
               searchPlaceholder="Search locations..."
             />
+            {errors.toLocationId?.message && (
+              <p className="text-sm text-destructive">{errors.toLocationId.message}</p>
+            )}
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="quantity">Quantity</Label>
-            <Input
-              id="quantity"
-              type="number"
-              min="1"
-              value={formData.quantity}
-              onChange={(e) => setFormData({ ...formData, quantity: e.target.value })}
-              required
-            />
+            <Label>Quantity</Label>
+            <Input type="number" {...register("quantity")} />
+            {errors.quantity?.message && (
+              <p className="text-sm text-destructive">{errors.quantity.message}</p>
+            )}
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="reason">Reason</Label>
-            <Select value={formData.reason} onValueChange={(value) => setFormData({ ...formData, reason: value })}>
+            <Label>Reason</Label>
+            <Select
+              value={watch("reason")}
+              onValueChange={(value) =>
+                reset({ ...watch(), reason: value })
+              }
+            >
               <SelectTrigger>
                 <SelectValue placeholder="Select reason" />
               </SelectTrigger>
@@ -202,6 +257,9 @@ export function StockTransferFormDialog({ open, onOpenChange }: StockTransferFor
                 <SelectItem value="other">Other</SelectItem>
               </SelectContent>
             </Select>
+            {errors.reason?.message && (
+              <p className="text-sm text-destructive">{errors.reason.message}</p>
+            )}
           </div>
 
           <DialogFooter>
@@ -210,9 +268,9 @@ export function StockTransferFormDialog({ open, onOpenChange }: StockTransferFor
             </Button>
             <Button
               type="submit"
-              disabled={!hasPermission("stock.transfer:create") || createMutation.isPending || !formData.fromLocationId || !formData.productId}
+              disabled={!hasPermission("stock.transfer:create") || isPending}
             >
-              {createMutation.isPending ? "Creating..." : "Create Transfer"}
+              {isPending ? "Creating..." : "Create Transfer"}
             </Button>
           </DialogFooter>
         </form>

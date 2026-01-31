@@ -14,17 +14,22 @@ import { usePartners } from "@/lib/hooks/use-partners"
 import { RecordReceivablePaymentDialog } from "@/components/finance/receivables/record-receivable-payment-dialog"
 import { RequirePermission } from "@/components/auth/require-permission"
 import { useAuth } from "@/lib/hooks/use-auth"
+import { useInvoice } from "@/lib/hooks/use-finance"
+import { Separator } from "@/components/ui/separator"
 
 export default function ReceivableDetailPage() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
   const [showPaymentDialog, setShowPaymentDialog] = useState(false)
 
-  const { data: receivable, isLoading } = useReceivable(id)
+  const { data: receivable = [], isLoading } = useReceivable(id)
   const { data: payments } = useReceivablePayments(id)
   const { data: partners } = usePartners("customer")
   const { hasPermission } = useAuth()
 
+  const invoiceId = receivable?.invoice_id ?? null
+  const { data: invoice } = useInvoice(invoiceId)
+  
   if (isLoading) {
     return (
       <DashboardLayout>
@@ -34,7 +39,7 @@ export default function ReceivableDetailPage() {
       </DashboardLayout>
     )
   }
-
+  
   if (!receivable) {
     return (
       <DashboardLayout>
@@ -44,7 +49,7 @@ export default function ReceivableDetailPage() {
       </DashboardLayout>
     )
   }
-
+  
   const partner = partners?.find((p) => p.id === receivable.partner_id)
 
   const getStatusVariant = (status: string) => {
@@ -107,6 +112,44 @@ export default function ReceivableDetailPage() {
                   </div>
                 </CardContent>
               </Card>
+            {invoice && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Related Invoice</CardTitle>
+                </CardHeader>
+
+                <CardContent className="space-y-3">
+                  <div className="flex justify-between">
+                    <span className="text-sm text-muted-foreground">Invoice Number</span>
+                    <span className="font-medium">{invoice.invoice_number}</span>
+                  </div>
+
+                  <div className="flex justify-between">
+                    <span className="text-sm text-muted-foreground">Status</span>
+                    <Badge variant="outline">
+                      {invoice.status.toUpperCase()}
+                    </Badge>
+                  </div>
+
+                  <div className="flex justify-between">
+                    <span className="text-sm text-muted-foreground">Invoice Date</span>
+                    <span className="text-sm">
+                      {new Date(invoice.invoice_date).toLocaleDateString()}
+                    </span>
+                  </div>
+
+                  <Separator />
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => router.push(`/finance/invoices/${invoice.id}`)}
+                  >
+                    View Invoice Details
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
 
               <Card>
                 <CardHeader>

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import { MoreHorizontal, Plus, Search, CheckCircle2, XCircle, UserCog } from "lucide-react"
 import { useUsers, useDeleteUser, useUpdateUserStatus } from "@/lib/hooks/use-users"
 import { Button } from "@/components/ui/button"
@@ -19,25 +19,49 @@ import { UserFormDialog } from "./user-form-dialog"
 import { UserRolesDialog } from "./user-roles-dialog"
 import type { User } from "@/lib/types/user"
 import { useAuth } from "@/lib/hooks/use-auth"
+import type { AxiosError } from "axios"
+import { parseApiError } from "@/lib/api/parse-api-error"
+import { showApiErrorToast } from "@/lib/api/show-api-error-toast"
+import { useToast } from "@/hooks/use-toast"
+
+const PAGE_SIZE = 10
 
 export function UserTable() {
   const [search, setSearch] = useState("")
+  const [page, setPage] = useState(1)
+
   const [selectedUser, setSelectedUser] = useState<User | null>(null)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [isRolesDialogOpen, setIsRolesDialogOpen] = useState(false)
   const [userToDelete, setUserToDelete] = useState<User | null>(null)
 
   const { hasPermission } = useAuth()
-  const { data: users, isLoading } = useUsers()
+  const { data: users = [], isLoading } = useUsers()
   const deleteMutation = useDeleteUser()
   const updateStatusMutation = useUpdateUserStatus()
+  const toast = useToast()
 
-  const filteredUsers = users?.filter(
-    (user) =>
-      user.firstName.toLowerCase().includes(search.toLowerCase()) ||
-      user.lastName.toLowerCase().includes(search.toLowerCase()) ||
-      user.email.toLowerCase().includes(search.toLowerCase()),
-  )
+  const filteredUsers = useMemo(() => {
+    const q = search.toLowerCase()
+    return users.filter(
+      (user) =>
+        user.firstName.toLowerCase().includes(q) ||
+        user.lastName.toLowerCase().includes(q) ||
+        user.email.toLowerCase().includes(q),
+    )
+  }, [users, search])
+
+  const totalItems = filteredUsers.length
+  const totalPages = Math.max(1, Math.ceil(totalItems / PAGE_SIZE))
+  const startIndex = (page - 1) * PAGE_SIZE
+  const endIndex = Math.min(startIndex + PAGE_SIZE, totalItems)
+
+  const paginatedUsers = filteredUsers.slice(startIndex, endIndex)
+
+  // keep page valid when search changes
+  if (page > totalPages) {
+    setPage(totalPages)
+  }
 
   const handleEdit = (user: User) => {
     setSelectedUser(user)
@@ -53,14 +77,34 @@ export function UserTable() {
     setUserToDelete(user)
   }
   const confirmDelete = () => {
-      if (userToDelete) {
-        deleteMutation.mutate(userToDelete.id)
-      }
+    if (!userToDelete) return
+
+    deleteMutation.mutate(userToDelete.id, {
+      onSuccess: () => {
+        toast.success("User deleted", "The user was deleted successfully.")
+        setUserToDelete(null)
+      },
+      onError: (e: AxiosError) =>
+        showApiErrorToast(parseApiError(e), toast, "Failed to delete user."),
+    })
   }
 
   const handleToggleStatus = (id: string, currentStatus: boolean) => {
-    updateStatusMutation.mutate({ id, isActive: !currentStatus })
+    updateStatusMutation.mutate(
+      { id, isActive: !currentStatus },
+      {
+        onSuccess: () => {
+          toast.success(
+            "Status updated",
+            `User is now ${currentStatus ? "Inactive" : "Active"}.`,
+          )
+        },
+        onError: (e: AxiosError) =>
+          showApiErrorToast(parseApiError(e), toast, "Failed to update status."),
+      },
+    )
   }
+
 
   return (
     <div className="space-y-4">
@@ -70,19 +114,25 @@ export function UserTable() {
           <Input
             placeholder="Search users..."
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => {
+              setSearch(e.target.value)
+              setPage(1)
+            }}
             className="pl-9"
           />
         </div>
-       { hasPermission("user:create") && ( <Button
-          onClick={() => {
-            setSelectedUser(null)
-            setIsDialogOpen(true)
-          }}
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Add User
-        </Button> )}
+
+        {hasPermission("user:create") && (
+          <Button
+            onClick={() => {
+              setSelectedUser(null)
+              setIsDialogOpen(true)
+            }}
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Add User
+          </Button>
+        )}
       </div>
 
       <div className="rounded-md border">
@@ -103,14 +153,14 @@ export function UserTable() {
                   Loading...
                 </TableCell>
               </TableRow>
-            ) : filteredUsers?.length === 0 ? (
+            ) : paginatedUsers.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={5} className="text-center text-muted-foreground">
                   No users found
                 </TableCell>
               </TableRow>
             ) : (
-              filteredUsers?.map((user) => (
+              paginatedUsers.map((user) => (
                 <TableRow key={user.id}>
                   <TableCell className="font-medium">
                     {user.firstName} {user.lastName}
@@ -148,18 +198,29 @@ export function UserTable() {
                       <DropdownMenuContent align="end">
                         <DropdownMenuLabel>Actions</DropdownMenuLabel>
                         <DropdownMenuSeparator />
-                        {hasPermission("user:update") && (<DropdownMenuItem onClick={() => handleEdit(user)}>Edit</DropdownMenuItem>) }
-                        {hasPermission("user:assign-role") && (<DropdownMenuItem onClick={() => handleManageRoles(user)}>
-                          <UserCog className="h-4 w-4 mr-2" />
-                          Manage Roles
-                        </DropdownMenuItem>)}
-                        {hasPermission("user:update-status") && ( <DropdownMenuItem onClick={() => handleToggleStatus(user.id, user.isActive)}>
-                          {user.isActive ? "Deactivate" : "Activate"}
-                        </DropdownMenuItem>) }
+                        {hasPermission("user:update") && (
+                          <DropdownMenuItem onClick={() => handleEdit(user)}>Edit</DropdownMenuItem>
+                        )}
+                        {hasPermission("user:assign-role") && (
+                          <DropdownMenuItem onClick={() => handleManageRoles(user)}>
+                            <UserCog className="h-4 w-4 mr-2" />
+                            Manage Roles
+                          </DropdownMenuItem>
+                        )}
+                        {hasPermission("user:update-status") && (
+                          <DropdownMenuItem onClick={() => handleToggleStatus(user.id, user.isActive)}>
+                            {user.isActive ? "Deactivate" : "Activate"}
+                          </DropdownMenuItem>
+                        )}
                         <DropdownMenuSeparator />
-                       {hasPermission("user:delete") && ( <DropdownMenuItem onClick={() => handleDelete(user)} className="text-destructive">
-                          Delete
-                        </DropdownMenuItem>)}
+                        {hasPermission("user:delete") && (
+                          <DropdownMenuItem
+                            onClick={() => handleDelete(user)}
+                            className="text-destructive"
+                          >
+                            Delete
+                          </DropdownMenuItem>
+                        )}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>
@@ -170,6 +231,34 @@ export function UserTable() {
         </Table>
       </div>
 
+      {/* Pagination footer – additive only */}
+      {totalItems > PAGE_SIZE && (
+        <div className="flex items-center justify-between text-sm text-muted-foreground">
+          <div>
+            Showing {startIndex + 1}–{endIndex} of {totalItems}
+          </div>
+
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={page === 1}
+              onClick={() => setPage((p) => p - 1)}
+            >
+              Previous
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={page === totalPages}
+              onClick={() => setPage((p) => p + 1)}
+            >
+              Next
+            </Button>
+          </div>
+        </div>
+      )}
+
       <UserFormDialog user={selectedUser} open={isDialogOpen} onOpenChange={setIsDialogOpen} />
       <UserRolesDialog user={selectedUser} open={isRolesDialogOpen} onOpenChange={setIsRolesDialogOpen} />
       <ConfirmDeleteDialog
@@ -179,7 +268,9 @@ export function UserTable() {
         title="Delete User"
         description="Are you sure you want to delete this user? This will permanently remove the user and all associated data."
         itemName={
-          userToDelete ? `${userToDelete.firstName} ${userToDelete.lastName} (${userToDelete.email})` : undefined
+          userToDelete
+            ? `${userToDelete.firstName} ${userToDelete.lastName} (${userToDelete.email})`
+            : undefined
         }
       />
     </div>

@@ -19,6 +19,10 @@ import { CategoryFormDialog } from "./category-form-dialog"
 import { ConfirmDeleteDialog } from "@/components/shared/confirm-delete-dialog"
 import type { Category } from "@/lib/types/master-data"
 import { useAuth } from "@/lib/hooks/use-auth"
+import type { AxiosError } from "axios"
+import { parseApiError } from "@/lib/api/parse-api-error"
+import { showApiErrorToast } from "@/lib/api/show-api-error-toast"
+import { useToast } from "@/hooks/use-toast"
 
 export function CategoryTable() {
   const router = useRouter()
@@ -31,6 +35,7 @@ export function CategoryTable() {
   const { hasPermission } = useAuth()
   const { data: categories, isLoading } = useCategories()
   const deleteMutation = useDeleteCategory()
+  const toast = useToast()
 
   const filteredCategories = categories?.filter((category) =>
     category.name.toLowerCase().includes(search.toLowerCase()),
@@ -46,10 +51,16 @@ export function CategoryTable() {
   }
 
   const confirmDelete = () => {
-    if (categoryToDelete) {
-      deleteMutation.mutate(categoryToDelete.id)
-      setCategoryToDelete(null)
-    }
+    if (!categoryToDelete) return
+
+    deleteMutation.mutate(categoryToDelete.id, {
+      onSuccess: () => {
+        toast.success("Category deleted", "The category was deleted successfully.")
+        setCategoryToDelete(null)
+      },
+      onError: (e: AxiosError) =>
+        showApiErrorToast(parseApiError(e), toast, "Failed to delete category."),
+    })
   }
 
   const handleViewDetails = (id: string) => {

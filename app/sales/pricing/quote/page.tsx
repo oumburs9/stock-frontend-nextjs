@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button"
 import { DollarSign, TrendingUp, Package } from "lucide-react"
 import { RequirePermission } from "@/components/auth/require-permission"
 import { useAuth } from "@/lib/hooks/use-auth"
+import { formatCurrency } from "@/lib/utils/currency"
 
 export default function PriceQuotePage() {
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null)
@@ -89,7 +90,7 @@ export default function PriceQuotePage() {
                 </CardHeader>
                 <CardContent>
                   <div className="text-4xl font-bold text-primary">
-                    ${Number.parseFloat(priceQuote.listPrice).toFixed(2)}
+                    {formatCurrency(Number(priceQuote.listPrice ?? 0), 'ETB')}
                   </div>
                   <p className="text-sm text-muted-foreground mt-2">Per unit</p>
                 </CardContent>
@@ -105,7 +106,7 @@ export default function PriceQuotePage() {
                 <CardContent className="space-y-3">
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Unit Cost:</span>
-                    <span className="font-semibold">${Number.parseFloat(priceQuote.unitCost).toFixed(2)}</span>
+                    <span className="font-semibold">{formatCurrency(Number(priceQuote.unitCost ?? 0), 'ETB')}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Cost Basis:</span>

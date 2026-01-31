@@ -2,18 +2,26 @@
 
 import { useEffect, useState } from "react"
 import { useForm, useFieldArray } from "react-hook-form"
+import type { AxiosError } from "axios"
+
 import { useCreateShipment, useUpdateShipment } from "@/lib/hooks/use-shipments"
 import { useProducts } from "@/lib/hooks/use-products"
 import { usePurchaseOrders } from "@/lib/hooks/use-purchase-orders"
 import { usePartners } from "@/lib/hooks/use-partners"
+
+import { parseApiError } from "@/lib/api/parse-api-error"
+import { showApiErrorToast } from "@/lib/api/show-api-error-toast"
+
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+
 import { useToast } from "@/hooks/use-toast"
 import { Plus, Trash2 } from "lucide-react"
 import { SearchableCombobox } from "@/components/shared/searchable-combobox"
+
 import type { PurchaseShipment, CreateShipmentRequest } from "@/lib/types/purchase"
 import { useAuth } from "@/lib/hooks/use-auth"
 
@@ -30,10 +38,23 @@ interface ShipmentFormDialogProps {
   onOpenChange: (open: boolean) => void
 }
 
+type ShipmentFormValues = {
+  code: string
+  type: "import" | "local"
+  supplier_id: string
+  departure_date: string | null
+  arrival_date: string | null
+  currency: string
+  exchange_rate: string | null
+  notes: string | null
+  items: ShipmentItemRow[]
+}
+
 export function ShipmentFormDialog({ shipment, open, onOpenChange }: ShipmentFormDialogProps) {
-  const { toast } = useToast()
+  const toast = useToast()
   const createMutation = useCreateShipment()
   const updateMutation = useUpdateShipment()
+
   const { data: products } = useProducts()
   const { data: purchaseOrders } = usePurchaseOrders({ status: "approved" })
   const { data: suppliers } = usePartners("supplier")
@@ -46,18 +67,10 @@ export function ShipmentFormDialog({ shipment, open, onOpenChange }: ShipmentFor
     control,
     watch,
     setValue,
+    setError,
+    clearErrors,
     formState: { errors },
-  } = useForm<{
-    code: string
-    type: "import" | "local"
-    supplier_id: string
-    departure_date: string | null
-    arrival_date: string | null
-    currency: string
-    exchange_rate: string | null
-    notes: string | null
-    items: ShipmentItemRow[]
-  }>({
+  } = useForm<ShipmentFormValues>({
     defaultValues: {
       code: "",
       type: "import",
@@ -77,8 +90,11 @@ export function ShipmentFormDialog({ shipment, open, onOpenChange }: ShipmentFor
   })
 
   const [poDetailsCache, setPoDetailsCache] = useState<Record<string, any>>({})
+  const [formError, setFormError] = useState<string | null>(null)
 
   useEffect(() => {
+    setFormError(null)
+
     if (shipment) {
       reset({
         code: shipment.code,
@@ -109,7 +125,7 @@ export function ShipmentFormDialog({ shipment, open, onOpenChange }: ShipmentFor
         items: [{ po_item_id: null, product_id: "", quantity_expected: "1", linked_po_id: "" }],
       })
     }
-  }, [shipment, reset])
+  }, [shipment, reset, open])
 
   const handlePOSelection = async (index: number, poId: string) => {
     if (!poId) {
@@ -119,14 +135,12 @@ export function ShipmentFormDialog({ shipment, open, onOpenChange }: ShipmentFor
       return
     }
 
-    // Fetch PO details if not cached
     if (!poDetailsCache[poId]) {
       try {
         const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/purchase/orders/${poId}`)
         const poDetails = await response.json()
         setPoDetailsCache((prev) => ({ ...prev, [poId]: poDetails }))
-      } catch (error) {
-        // Fallback to using purchaseOrders data
+      } catch {
         const po = purchaseOrders?.find((p: any) => p.id === poId)
         if (po) {
           setPoDetailsCache((prev) => ({ ...prev, [poId]: po }))
@@ -152,58 +166,61 @@ export function ShipmentFormDialog({ shipment, open, onOpenChange }: ShipmentFor
     }
   }
 
-  const onSubmit = async (data: any) => {
-    try {
-      const transformedItems = data.items.map((item: ShipmentItemRow) => ({
-        ...(item.po_item_id && { purchase_order_item_id: item.po_item_id }),
-        product_id: item.product_id,
-        quantity_expected: item.quantity_expected,
-      }))
+  const onSubmit = (data: ShipmentFormValues) => {
+    setFormError(null)
 
-      const payload: CreateShipmentRequest = {
-        code: data.code,
-        type: data.type,
-        supplier_id: data.supplier_id,
-        departure_date: data.departure_date || undefined,
-        arrival_date: data.arrival_date || undefined,
-        currency: data.currency,
-        exchange_rate: data.exchange_rate || undefined,
-        notes: data.notes || undefined,
-        items: transformedItems,
-      }
+    const transformedItems = data.items.map((item) => ({
+      ...(item.po_item_id && { purchase_order_item_id: item.po_item_id }),
+      product_id: item.product_id,
+      quantity_expected: item.quantity_expected,
+    }))
 
-      if (shipment) {
-        await updateMutation.mutateAsync({
+    const payload: CreateShipmentRequest = {
+      code: data.code,
+      type: data.type,
+      supplier_id: data.supplier_id,
+      departure_date: data.departure_date || undefined,
+      arrival_date: data.arrival_date || undefined,
+      currency: data.currency,
+      exchange_rate: data.exchange_rate || undefined,
+      notes: data.notes || undefined,
+      items: transformedItems,
+    }
+
+    const action = shipment
+      ? updateMutation.mutateAsync({
           id: shipment.id,
           data: {
-            arrival_date: data.arrival_date || null,
-            departure_date: data.departure_date  || null,
-            exchange_rate: data.exchange_rate  || null,
-            notes: data.notes  || null,
-            // Note: receiving_warehouse_id and receiving_shop_id are set during receiving, not here
+            departure_date: data.departure_date || undefined,
+            arrival_date: data.arrival_date || undefined,
+            exchange_rate: data.exchange_rate || undefined,
+            notes: data.notes || undefined,
             items: transformedItems,
           },
         })
-        toast({
-          title: "Success",
-          description: "Shipment updated successfully",
-        })
-      } else {
-        await createMutation.mutateAsync(payload)
-        toast({
-          title: "Success",
-          description: "Shipment created successfully",
-        })
-      }
-      onOpenChange(false)
-      reset()
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.response?.data?.message || "An error occurred",
-        variant: "destructive",
+      : createMutation.mutateAsync(payload)
+
+    action
+      .then(() => {
+        toast.success(shipment ? "Shipment updated" : "Shipment created")
+        onOpenChange(false)
+        reset()
       })
-    }
+      .catch((e: AxiosError) => {
+        // console.log("e: ", e)
+        const parsed = parseApiError(e)
+        // console.log("e: ", parsed)
+
+        if (parsed.type === "validation") {
+          Object.entries(parsed.fieldErrors).forEach(([field, message]) => {
+            setError(field as any, { message })
+          })
+          if (parsed.formError) setFormError(parsed.formError)
+          return
+        }
+
+        showApiErrorToast(parsed, toast)
+      })
   }
 
   const supplierOptions =
@@ -235,7 +252,7 @@ export function ShipmentFormDialog({ shipment, open, onOpenChange }: ShipmentFor
   }
 
   const canEditItems = !shipment || shipment.status === "draft"
-  const canEditSupplier = !shipment // Supplier cannot be changed after creation per frozen API
+  const canEditSupplier = !shipment
   const isEditMode = !!shipment
 
   return (
@@ -244,35 +261,41 @@ export function ShipmentFormDialog({ shipment, open, onOpenChange }: ShipmentFor
         <DialogHeader>
           <DialogTitle>{shipment ? "Edit Shipment (BL)" : "Create Shipment (BL)"}</DialogTitle>
         </DialogHeader>
+
+        {formError && (
+          <div className="rounded-md border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">
+            {formError}
+          </div>
+        )}
+
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          {/* Section 1: Shipment Header */}
+          {/* ---------- SHIPMENT HEADER ---------- */}
           <div className="space-y-4 p-4 border rounded-md bg-muted/30">
             <h3 className="font-medium text-sm">Shipment Information</h3>
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="code">BL Code *</Label>
-                <Input
-                  id="code"
-                  {...register("code", { required: "Code is required" })}
-                  disabled={isEditMode}
-                  placeholder="BL-001"
-                />
-                {errors.code && <p className="text-sm text-destructive">{errors.code.message}</p>}
+                <Input id="code" {...register("code")} disabled={isEditMode} placeholder="BL-001" />
+                {errors.code?.message && (
+                  <p className="text-sm text-destructive">{errors.code.message}</p>
+                )}
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="type">Type *</Label>
                 <select
                   id="type"
-                  {...register("type", { required: "Type is required" })}
+                  {...register("type")}
                   disabled={isEditMode}
-                  className="w-full px-3 py-2 text-sm border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+                  className="w-full px-3 py-2 text-sm border border-input rounded-md bg-background"
                 >
                   <option value="import">Import</option>
                   <option value="local">Local</option>
                 </select>
-                {errors.type && <p className="text-sm text-destructive">{errors.type.message}</p>}
+                {errors.type?.message && (
+                  <p className="text-sm text-destructive">{errors.type.message}</p>
+                )}
               </div>
             </div>
 
@@ -280,14 +303,17 @@ export function ShipmentFormDialog({ shipment, open, onOpenChange }: ShipmentFor
               <Label>Supplier *</Label>
               <SearchableCombobox
                 value={watch("supplier_id")}
-                onChange={(value) => setValue("supplier_id", value)}
+                 onChange={(v) => {
+                        setValue("supplier_id", v)
+                        clearErrors("supplier_id")
+                      }}
                 options={supplierOptions}
-                placeholder="Select supplier..."
-                searchPlaceholder="Search suppliers..."
-                emptyMessage="No suppliers found."
                 disabled={!canEditSupplier}
+                placeholder="Select supplier..."
               />
-              {errors.supplier_id && <p className="text-sm text-destructive">{errors.supplier_id.message}</p>}
+              {errors.supplier_id?.message && (
+                <p className="text-sm text-destructive">{errors.supplier_id.message}</p>
+              )}
             </div>
 
             <div className="grid grid-cols-2 gap-4">
@@ -308,7 +334,7 @@ export function ShipmentFormDialog({ shipment, open, onOpenChange }: ShipmentFor
                 <Input id="currency" {...register("currency")} placeholder="ETB" />
               </div>
 
-              <div className="space-y-2">
+              {/* <div className="space-y-2">
                 <Label htmlFor="exchange_rate">Exchange Rate</Label>
                 <Input
                   id="exchange_rate"
@@ -317,7 +343,7 @@ export function ShipmentFormDialog({ shipment, open, onOpenChange }: ShipmentFor
                   {...register("exchange_rate")}
                   placeholder="1.0"
                 />
-              </div>
+              </div> */}
             </div>
 
             <div className="space-y-2">
@@ -326,19 +352,20 @@ export function ShipmentFormDialog({ shipment, open, onOpenChange }: ShipmentFor
             </div>
           </div>
 
-          {/* Section 2: Shipment Items (Flexible Repeater) */}
+          {/* ---------- ITEMS ---------- */}
           <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <Label className="text-base font-medium">Shipment Items *</Label>
+            <div className="flex justify-between">
+              <Label className="text-base">Shipment Items *</Label>
               {canEditItems && (
                 <Button
                   type="button"
                   size="sm"
                   variant="outline"
-                  onClick={() => append({ po_item_id: null, product_id: "", quantity_expected: "1", linked_po_id: "" })}
+                  onClick={() =>
+                    append({ po_item_id: null, product_id: "", quantity_expected: "1", linked_po_id: "" })
+                  }
                 >
-                  <Plus className="h-4 w-4 mr-1" />
-                  Add Item
+                  <Plus className="h-4 w-4 mr-1" /> Add Item
                 </Button>
               )}
             </div>
@@ -349,9 +376,9 @@ export function ShipmentFormDialog({ shipment, open, onOpenChange }: ShipmentFor
               const isPOLinked = !!poItemId
 
               return (
-                <div key={field.id} className="p-4 border rounded-md bg-card space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-muted-foreground">Item {index + 1}</span>
+                <div key={field.id} className="p-4 border rounded-md space-y-3">
+                  <div className="flex justify-between">
+                    <span className="text-sm">Item {index + 1}</span>
                     {canEditItems && fields.length > 1 && (
                       <Button type="button" size="sm" variant="ghost" onClick={() => remove(index)}>
                         <Trash2 className="h-4 w-4" />
@@ -359,13 +386,12 @@ export function ShipmentFormDialog({ shipment, open, onOpenChange }: ShipmentFor
                     )}
                   </div>
 
-                  {/* PO Selection (Optional) */}
                   {canEditItems && (
                     <div className="space-y-2">
                       <Label className="text-xs text-muted-foreground">Link to Purchase Order (Optional)</Label>
                       <SearchableCombobox
                         value={linkedPoId || ""}
-                        onChange={(value) => handlePOSelection(index, value)}
+                        onChange={(v) => handlePOSelection(index, v)}
                         options={poOptions}
                         placeholder="Select PO to link (or leave blank)..."
                         searchPlaceholder="Search POs..."
@@ -374,52 +400,48 @@ export function ShipmentFormDialog({ shipment, open, onOpenChange }: ShipmentFor
                     </div>
                   )}
 
-                  {/* If PO selected, show PO Item selector */}
                   {canEditItems && linkedPoId && (
                     <div className="space-y-2">
-                      <Label className="text-xs text-muted-foreground">PO Item</Label>
-                      <SearchableCombobox
-                        value={poItemId || ""}
-                        onChange={(value) => handlePOItemSelection(index, value)}
-                        options={getPOItemOptions(linkedPoId)}
-                        placeholder="Select PO item..."
-                        searchPlaceholder="Search PO items..."
-                        emptyMessage="No items found in this PO."
-                      />
+                    <Label className="text-xs text-muted-foreground">PO Item</Label>
+                    <SearchableCombobox
+                      value={poItemId || ""}
+                      onChange={(v) => handlePOItemSelection(index, v)}
+                      options={getPOItemOptions(linkedPoId)}
+                      placeholder="Select PO item"
+                      searchPlaceholder="Search PO items..."
+                      emptyMessage="No items found in this PO."
+                      
+                    />
                     </div>
                   )}
-
-                  {/* Product (auto-filled if PO item selected, manual otherwise) */}
                   <div className="space-y-2">
-                    <Label className="text-xs text-muted-foreground">Product *</Label>
-                    <SearchableCombobox
-                      value={watch(`items.${index}.product_id`)}
-                      onChange={(value) => setValue(`items.${index}.product_id`, value)}
-                      options={productOptions}
-                      placeholder="Select product..."
-                      searchPlaceholder="Search products..."
-                      emptyMessage="No products found."
-                      disabled={isPOLinked || !canEditItems}
-                    />
-                    {errors.items?.[index]?.product_id && (
-                      <p className="text-xs text-destructive">{errors.items[index]?.product_id?.message}</p>
-                    )}
+                  <Label className="text-xs text-muted-foreground">Product *</Label>
+                  <SearchableCombobox
+                    value={watch(`items.${index}.product_id`)}
+                    onChange={(v) => setValue(`items.${index}.product_id`, v)}
+                    options={productOptions}
+                    disabled={isPOLinked || !canEditItems}
+                    placeholder="Select product"
+                    searchPlaceholder="Search products..."
+                    emptyMessage="No products found."
+                  />
                   </div>
-
-                  {/* Quantity Expected */}
                   <div className="space-y-2">
-                    <Label className="text-xs text-muted-foreground">Quantity Expected *</Label>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      placeholder="Enter quantity"
-                      {...register(`items.${index}.quantity_expected`, { required: "Required" })}
-                      disabled={!canEditItems}
-                    />
-                    {errors.items?.[index]?.quantity_expected && (
-                      <p className="text-xs text-destructive">{errors.items[index]?.quantity_expected?.message}</p>
-                    )}
-                  </div>
+                  <Label className="text-xs text-muted-foreground">Quantity Expected *</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    {...register(`items.${index}.quantity_expected`)}
+                    disabled={!canEditItems}
+                    placeholder="Enter quantity"
+                  />
+
+                  {errors.items?.[index]?.quantity_expected?.message && (
+                    <p className="text-xs text-destructive">
+                      {errors.items[index]?.quantity_expected?.message}
+                    </p>
+                  )}
+              </div>
                 </div>
               )
             })}
@@ -429,16 +451,17 @@ export function ShipmentFormDialog({ shipment, open, onOpenChange }: ShipmentFor
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button 
-              type="submit" 
+            <Button
+              type="submit"
               disabled={
                 Boolean(
-                createMutation.isPending || updateMutation.isPending ||
+                createMutation.isPending ||
+                updateMutation.isPending ||
                 (!shipment && !hasPermission("purchase-shipment:create")) ||
-                (shipment !== null && !hasPermission("purchase-shipment:update"))
+                (shipment && !hasPermission("purchase-shipment:update"))
                 )
               }
-              >
+            >
               {createMutation.isPending || updateMutation.isPending ? "Saving..." : "Save"}
             </Button>
           </DialogFooter>

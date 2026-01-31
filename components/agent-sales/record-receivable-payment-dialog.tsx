@@ -2,6 +2,7 @@
 
 import { useEffect } from "react"
 import { useForm } from "react-hook-form"
+import type { AxiosError } from "axios"
 import { useCreateReceivablePayment } from "@/lib/hooks/use-finance"
 import { usePaymentSources } from "@/lib/hooks/use-payment-sources"
 import { Button } from "@/components/ui/button"
@@ -13,6 +14,8 @@ import { useToast } from "@/hooks/use-toast"
 import type { Receivable, CreateReceivablePaymentRequest } from "@/lib/types/finance"
 import { formatCurrency } from "@/lib/utils/currency"
 import { useAuth } from "@/lib/hooks/use-auth"
+import { parseApiError } from "@/lib/api/parse-api-error"
+import { showApiErrorToast } from "@/lib/api/show-api-error-toast"
 
 interface RecordReceivablePaymentDialogProps {
   open: boolean
@@ -21,7 +24,7 @@ interface RecordReceivablePaymentDialogProps {
 }
 
 export function RecordReceivablePaymentDialog({ open, receivable, onOpenChange }: RecordReceivablePaymentDialogProps) {
-  const { toast } = useToast()
+  const toast = useToast()
   const createMutation = useCreateReceivablePayment()
   const { data: paymentSources = [] } = usePaymentSources()
   const { hasPermission } = useAuth()
@@ -32,6 +35,8 @@ export function RecordReceivablePaymentDialog({ open, receivable, onOpenChange }
     reset,
     watch,
     setValue,
+    setError,
+    clearErrors,
     formState: { errors },
   } = useForm<CreateReceivablePaymentRequest>({
     defaultValues: {
@@ -54,25 +59,44 @@ export function RecordReceivablePaymentDialog({ open, receivable, onOpenChange }
         paymentSourceId: "",
         reference: null,
       })
+      clearErrors()
     }
-  }, [receivable, open, reset])
+  }, [receivable, open, reset, clearErrors])
 
-  const onSubmit = async (data: CreateReceivablePaymentRequest) => {
+  const handleOpenChange = (nextOpen: boolean) => {
+    onOpenChange(nextOpen)
+    if (!nextOpen) {
+      reset({
+        receivableId: "",
+        paymentDate: new Date().toISOString().split("T")[0],
+        amount: "",
+        method: "bank",
+        paymentSourceId: "",
+        reference: null,
+      })
+      clearErrors()
+    }
+  }
+
+  const onSubmit = (data: CreateReceivablePaymentRequest) => {
     if (!hasPermission("receivable-payment:create")) return
+
     createMutation.mutate(data, {
       onSuccess: () => {
-        toast({
-          title: "Success",
-          description: "Payment recorded successfully",
-        })
-        onOpenChange(false)
+        toast.success("Payment recorded", "Payment recorded successfully")
+        handleOpenChange(false)
       },
-      onError: (error: any) => {
-        toast({
-          title: "Error",
-          description: error.response?.data?.message || "Failed to record payment",
-          variant: "destructive",
-        })
+      onError: (e: AxiosError) => {
+        const parsed = parseApiError(e)
+
+        if (parsed.type === "validation") {
+          Object.entries(parsed.fieldErrors).forEach(([field, message]) => {
+            setError(field as keyof CreateReceivablePaymentRequest, { message })
+          })
+          return
+        }
+
+        showApiErrorToast(parsed, toast, "Failed to record payment")
       },
     })
   }
@@ -80,7 +104,7 @@ export function RecordReceivablePaymentDialog({ open, receivable, onOpenChange }
   const activePaymentSources = paymentSources.filter((ps) => ps.is_active)
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle>Record Receivable Payment</DialogTitle>
@@ -99,7 +123,9 @@ export function RecordReceivablePaymentDialog({ open, receivable, onOpenChange }
               <Input
                 id="paymentDate"
                 type="date"
-                {...register("paymentDate", { required: "Payment date is required" })}
+                {...register("paymentDate", {
+                  onChange: () => clearErrors("paymentDate"),
+                })}
               />
               {errors.paymentDate && <p className="text-sm text-destructive">{errors.paymentDate.message}</p>}
             </div>
@@ -111,8 +137,7 @@ export function RecordReceivablePaymentDialog({ open, receivable, onOpenChange }
                 type="number"
                 step="0.01"
                 {...register("amount", {
-                  required: "Amount is required",
-                  min: { value: 0.01, message: "Amount must be positive" },
+                  onChange: () => clearErrors("amount"),
                 })}
               />
               {errors.amount && <p className="text-sm text-destructive">{errors.amount.message}</p>}
@@ -121,7 +146,13 @@ export function RecordReceivablePaymentDialog({ open, receivable, onOpenChange }
 
           <div className="space-y-2">
             <Label htmlFor="method">Payment Method *</Label>
-            <Select value={watch("method")} onValueChange={(value) => setValue("method", value)}>
+            <Select
+              value={watch("method")}
+              onValueChange={(value) => {
+                setValue("method", value)
+                clearErrors("method")
+              }}
+            >
               <SelectTrigger id="method">
                 <SelectValue />
               </SelectTrigger>
@@ -138,7 +169,10 @@ export function RecordReceivablePaymentDialog({ open, receivable, onOpenChange }
             <Label htmlFor="paymentSourceId">Payment Source</Label>
             <Select
               value={watch("paymentSourceId") || "none"}
-              onValueChange={(value) => setValue("paymentSourceId", value === "none" ? "" : value)}
+              onValueChange={(value) => {
+                setValue("paymentSourceId", value === "none" ? "" : value)
+                clearErrors("paymentSourceId")
+              }}
             >
               <SelectTrigger id="paymentSourceId">
                 <SelectValue />
@@ -156,11 +190,17 @@ export function RecordReceivablePaymentDialog({ open, receivable, onOpenChange }
 
           <div className="space-y-2">
             <Label htmlFor="reference">Reference</Label>
-            <Input id="reference" {...register("reference")} placeholder="Transaction reference..." />
+            <Input
+              id="reference"
+              {...register("reference", {
+                onChange: () => clearErrors("reference"),
+              })}
+              placeholder="Transaction reference..."
+            />
           </div>
 
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            <Button type="button" variant="outline" onClick={() => handleOpenChange(false)}>
               Cancel
             </Button>
             <Button type="submit" disabled={createMutation.isPending}>

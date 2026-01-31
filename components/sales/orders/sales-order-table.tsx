@@ -30,6 +30,9 @@ import { useToast } from "@/hooks/use-toast"
 import { useRouter } from "next/navigation"
 import type { SalesOrder } from "@/lib/types/sales"
 import { useAuth } from "@/lib/hooks/use-auth"
+import type { AxiosError } from "axios"
+import { parseApiError } from "@/lib/api/parse-api-error"
+import { showApiErrorToast } from "@/lib/api/show-api-error-toast"
 
 interface SalesOrderTableProps {
   searchQuery: string
@@ -39,7 +42,7 @@ interface SalesOrderTableProps {
 export function SalesOrderTable({ searchQuery, statusFilter }: SalesOrderTableProps) {
   const [confirmAction, setConfirmAction] = useState<{ type: string; order: SalesOrder } | null>(null)
   const [page, setPage] = useState(1)
-  const { toast } = useToast()
+  const toast  = useToast()
   const router = useRouter()
   const { hasPermission } = useAuth()
 
@@ -65,51 +68,36 @@ export function SalesOrderTable({ searchQuery, statusFilter }: SalesOrderTablePr
   const handleConfirm = async (order: SalesOrder) => {
     try {
       await confirmMutation.mutateAsync(order.id)
-      toast({
-        title: "Success",
-        description: "Sales order confirmed successfully",
-      })
+      toast.success("Sales order confirmed successfully")
       setConfirmAction(null)
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.response?.data?.message || "Failed to confirm sales order",
-        variant: "destructive",
-      })
+    } catch (e) {
+      const parsed = parseApiError(e as AxiosError)
+      if (parsed.type === "validation") return
+      showApiErrorToast(parsed, toast, "Failed to confirm sales order")
     }
   }
 
   const handleDeliver = async (order: SalesOrder) => {
     try {
       await deliverMutation.mutateAsync(order.id)
-      toast({
-        title: "Success",
-        description: "Sales order delivered successfully",
-      })
+      toast.success("Sales order delivered successfully")
       setConfirmAction(null)
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.response?.data?.message || "Failed to deliver sales order",
-        variant: "destructive",
-      })
+    } catch (e) {
+      const parsed = parseApiError(e as AxiosError)
+      if (parsed.type === "validation") return
+      showApiErrorToast(parsed, toast, "Failed to deliver sales order")
     }
   }
 
   const handleCancel = async (order: SalesOrder) => {
     try {
       await cancelMutation.mutateAsync(order.id)
-      toast({
-        title: "Success",
-        description: "Sales order cancelled successfully",
-      })
+      toast.success("Sales order cancelled successfully")
       setConfirmAction(null)
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.response?.data?.message || "Failed to cancel sales order",
-        variant: "destructive",
-      })
+    } catch (e) {
+      const parsed = parseApiError(e as AxiosError)
+      if (parsed.type === "validation") return
+      showApiErrorToast(parsed, toast, "Failed to cancel sales order")
     }
   }
 

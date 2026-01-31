@@ -1,8 +1,9 @@
 "use client"
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import type { AxiosError } from "axios"
 import { brandService } from "@/lib/services/brand.service"
-import type { CreateBrandRequest, UpdateBrandRequest } from "@/lib/types/master-data"
+import type { Brand, CreateBrandRequest, UpdateBrandRequest } from "@/lib/types/master-data"
 
 export function useBrands() {
   return useQuery({
@@ -23,8 +24,8 @@ export function useBrand(id: string | null) {
 export function useCreateBrand() {
   const queryClient = useQueryClient()
 
-  return useMutation({
-    mutationFn: (data: CreateBrandRequest) => brandService.createBrand(data),
+  return useMutation<Brand, AxiosError, CreateBrandRequest>({
+    mutationFn: (data) => brandService.createBrand(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["brands"] })
     },
@@ -34,8 +35,8 @@ export function useCreateBrand() {
 export function useUpdateBrand() {
   const queryClient = useQueryClient()
 
-  return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: UpdateBrandRequest }) => brandService.updateBrand(id, data),
+  return useMutation<void, AxiosError, { id: string; data: UpdateBrandRequest }>({
+    mutationFn: ({ id, data }) => brandService.updateBrand(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["brands"] })
     },
@@ -45,8 +46,8 @@ export function useUpdateBrand() {
 export function useDeleteBrand() {
   const queryClient = useQueryClient()
 
-  return useMutation({
-    mutationFn: (id: string) => brandService.deleteBrand(id),
+  return useMutation<void, AxiosError, string>({
+    mutationFn: (id) => brandService.deleteBrand(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["brands"] })
     },

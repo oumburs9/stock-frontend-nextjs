@@ -16,6 +16,10 @@ import { Plus, Trash2 } from "lucide-react"
 import type { PurchaseShipment, ReceiveShipmentRequest } from "@/lib/types/purchase"
 import { useProducts } from "@/lib/hooks/use-products"
 import { useAuth } from "@/lib/hooks/use-auth"
+import type { AxiosError } from "axios"
+import { parseApiError } from "@/lib/api/parse-api-error"
+import { showApiErrorToast } from "@/lib/api/show-api-error-toast"
+import { formatCurrency } from "@/lib/utils/currency"
 
 interface ReceiveShipmentDialogProps {
   shipment: PurchaseShipment
@@ -24,8 +28,13 @@ interface ReceiveShipmentDialogProps {
   onOpenChange: (open: boolean) => void
 }
 
-export function ReceiveShipmentDialog({ shipment, selectedItemId, open, onOpenChange }: ReceiveShipmentDialogProps) {
-  const { toast } = useToast()
+export function ReceiveShipmentDialog({
+  shipment,
+  selectedItemId,
+  open,
+  onOpenChange,
+}: ReceiveShipmentDialogProps) {
+  const toast = useToast()
   const receiveMutation = useReceiveShipment()
   const { data: warehouses = [] } = useWarehouses()
   const { data: shops = [] } = useShops()
@@ -34,9 +43,9 @@ export function ReceiveShipmentDialog({ shipment, selectedItemId, open, onOpenCh
   const { data: products } = useProducts()
   const { hasPermission } = useAuth()
 
-  const getProductName = (productrId: string) => {
-    const supplier = products?.find((s) => s.id === productrId)
-    return supplier?.name || productrId.slice(0, 8) + "..."
+  const getProductName = (productId: string) => {
+    const product = products?.find((p) => p.id === productId)
+    return product?.name || productId.slice(0, 8) + "..."
   }
 
   const canReceive = ["draft", "arrived", "cleared", "partially_received"].includes(shipment.status)
@@ -58,7 +67,9 @@ export function ReceiveShipmentDialog({ shipment, selectedItemId, open, onOpenCh
           {
             location_type: "warehouse",
             location_id: "",
-            quantity: String(Number.parseFloat(item.quantity_expected) - Number.parseFloat(item.quantity_received)),
+            quantity: String(
+              Number.parseFloat(item.quantity_expected) - Number.parseFloat(item.quantity_received),
+            ),
           },
         ],
       })),
@@ -67,11 +78,10 @@ export function ReceiveShipmentDialog({ shipment, selectedItemId, open, onOpenCh
 
   const onSubmit = async (data: ReceiveShipmentRequest) => {
     if (!canReceive) {
-      toast({
-        title: "Cannot Receive",
-        description: "Shipment can only be received in arrived, cleared, or partially_received status",
-        variant: "destructive",
-      })
+      toast.error(
+        "Cannot Receive",
+        "Shipment can only be received in arrived, cleared, or partially_received status",
+      )
       return
     }
 
@@ -82,16 +92,9 @@ export function ReceiveShipmentDialog({ shipment, selectedItemId, open, onOpenCh
         postings: Array.isArray(result?.postings) ? result.postings : [],
       })
       setShowPostings(true)
-      toast({
-        title: "Success",
-        description: "Shipment items received successfully",
-      })
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.response?.data?.message || "Failed to receive shipment",
-        variant: "destructive",
-      })
+      toast.success("Shipment received", "Shipment items received successfully")
+    } catch (e) {
+      showApiErrorToast(parseApiError(e as AxiosError), toast, "Failed to receive shipment")
     }
   }
 
@@ -105,12 +108,13 @@ export function ReceiveShipmentDialog({ shipment, selectedItemId, open, onOpenCh
               {postings.expense_per_unit}
             </DialogTitle>
           </DialogHeader>
+
           <div className="space-y-4">
             <div className="rounded-md border">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Product ID</TableHead>
+                    <TableHead>Product</TableHead>
                     <TableHead>Quantity</TableHead>
                     <TableHead>Location</TableHead>
                     <TableHead>Batch ID</TableHead>
@@ -119,25 +123,36 @@ export function ReceiveShipmentDialog({ shipment, selectedItemId, open, onOpenCh
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {(Array.isArray(postings?.postings) ? postings.postings : []).map((posting: any, index: number) => (
-                    <TableRow key={index}>
-                      <TableCell className="font-mono text-xs">{ getProductName(posting.product_id) }</TableCell>
-                      <TableCell>{posting.allocation.quantity}</TableCell>
-                      <TableCell>
-                        <div className="text-sm">
-                          <div className="font-medium">{posting.allocation.type}</div>
-                          <div className="text-xs text-muted-foreground">{posting.allocation.id.slice(0, 8)}...</div>
-                        </div>
-                      </TableCell>
-                      <TableCell className="font-mono text-xs">{posting.batch_id.slice(0, 8)}...</TableCell>
-                      <TableCell>{posting.stock_posting.beforeQuantity}</TableCell>
-                      <TableCell className="font-medium">{posting.stock_posting.afterQuantity}</TableCell>
-                    </TableRow>
-                  ))}
+                  {(Array.isArray(postings.postings) ? postings.postings : []).map(
+                    (posting: any, index: number) => (
+                      <TableRow key={index}>
+                        <TableCell className="font-mono text-xs">
+                          {getProductName(posting.product_id)}
+                        </TableCell>
+                        <TableCell>{posting.allocation.quantity}</TableCell>
+                        <TableCell>
+                          <div className="text-sm">
+                            <div className="font-medium">{posting.allocation.type}</div>
+                            <div className="text-xs text-muted-foreground">
+                              {posting.allocation.id.slice(0, 8)}...
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell className="font-mono text-xs">
+                          {posting.batch_id.slice(0, 8)}...
+                        </TableCell>
+                        <TableCell>{posting.stock_posting.beforeQuantity}</TableCell>
+                        <TableCell className="font-medium">
+                          {posting.stock_posting.afterQuantity}
+                        </TableCell>
+                      </TableRow>
+                    ),
+                  )}
                 </TableBody>
               </Table>
             </div>
           </div>
+
           <DialogFooter>
             <Button onClick={() => onOpenChange(false)}>Close</Button>
           </DialogFooter>
@@ -173,7 +188,9 @@ export function ReceiveShipmentDialog({ shipment, selectedItemId, open, onOpenCh
           <DialogHeader>
             <DialogTitle>No Items to Receive</DialogTitle>
           </DialogHeader>
-          <p className="text-sm text-muted-foreground">All items in this shipment have been fully received.</p>
+          <p className="text-sm text-muted-foreground">
+            All items in this shipment have been fully received.
+          </p>
           <DialogFooter>
             <Button onClick={() => onOpenChange(false)}>Close</Button>
           </DialogFooter>
@@ -188,21 +205,21 @@ export function ReceiveShipmentDialog({ shipment, selectedItemId, open, onOpenCh
         <DialogHeader>
           <DialogTitle>Receive Shipment: {shipment.code}</DialogTitle>
         </DialogHeader>
+
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="space-y-4">
             {itemsToReceive.map((item, lineIndex) => {
-              const remaining = Number.parseFloat(item.quantity_expected) - Number.parseFloat(item.quantity_received)
+              const remaining =
+                Number.parseFloat(item.quantity_expected) - Number.parseFloat(item.quantity_received)
 
               return (
                 <div key={item.id} className="border rounded-lg p-4 space-y-3">
                   <div className="flex items-center justify-between">
                     <div>
-                      {/* <p className="font-medium">Product: {item.product_id.slice(0, 16)}...</p> */}
-                       <p className="font-medium">Product: { getProductName(item.product_id) }</p>
-
+                      <p className="font-medium">Product: {getProductName(item.product_id)}</p>
                       <p className="text-sm text-muted-foreground">
-                        Expected: {item.quantity_expected} | Received: {item.quantity_received} | Remaining:{" "}
-                        {remaining.toFixed(2)}
+                        Expected: {item.quantity_expected} | Received: {item.quantity_received} |
+                        Remaining: {remaining.toFixed(2)}
                       </p>
                     </div>
                     <div className="space-y-1">
@@ -210,10 +227,10 @@ export function ReceiveShipmentDialog({ shipment, selectedItemId, open, onOpenCh
                       <Input
                         type="number"
                         step="0.01"
-                        placeholder="0.00"
                         className="w-32"
                         {...register(`lines.${lineIndex}.base_unit_cost`, { required: true })}
                       />
+                      <span className="text-xs text-muted-foreground">{formatCurrency(Number(watch(`lines.${lineIndex}.base_unit_cost`) ?? 0), ' ETB')}</span>
                     </div>
                   </div>
 
@@ -235,12 +252,10 @@ export function ReceiveShipmentDialog({ shipment, selectedItemId, open, onOpenCh
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button 
-              type="submit" 
-              disabled={
-                receiveMutation.isPending ||
-                !hasPermission("purchase-shipment:receive")
-                }>
+            <Button
+              type="submit"
+              disabled={receiveMutation.isPending || !hasPermission("purchase-shipment:receive")}
+            >
               {receiveMutation.isPending ? "Receiving..." : "Receive Items"}
             </Button>
           </DialogFooter>
@@ -272,8 +287,10 @@ function AllocationFields({ lineIndex, control, register, watch, setValue, wareh
       </div>
 
       {fields.map((field, allocIndex) => {
-        const locationType = watch(`lines.${lineIndex}.allocations.${allocIndex}.location_type`) || "warehouse"
-        const locationId = watch(`lines.${lineIndex}.allocations.${allocIndex}.location_id`) || ""
+        const locationType =
+          watch(`lines.${lineIndex}.allocations.${allocIndex}.location_type`) || "warehouse"
+        const locationId =
+          watch(`lines.${lineIndex}.allocations.${allocIndex}.location_id`) || ""
 
         const locationOptions =
           locationType === "warehouse"
@@ -285,7 +302,9 @@ function AllocationFields({ lineIndex, control, register, watch, setValue, wareh
             <div className="space-y-1">
               <Label className="text-xs">Type</Label>
               <select
-                {...register(`lines.${lineIndex}.allocations.${allocIndex}.location_type`, { required: true })}
+                {...register(`lines.${lineIndex}.allocations.${allocIndex}.location_type`, {
+                  required: true,
+                })}
                 className="px-2 py-1.5 text-sm border border-input rounded-md bg-background h-9"
               >
                 <option value="warehouse">Warehouse</option>
@@ -298,7 +317,9 @@ function AllocationFields({ lineIndex, control, register, watch, setValue, wareh
               <SearchableCombobox
                 options={locationOptions}
                 value={locationId}
-                onChange={(value) => setValue(`lines.${lineIndex}.allocations.${allocIndex}.location_id`, value)}
+                onChange={(value) =>
+                  setValue(`lines.${lineIndex}.allocations.${allocIndex}.location_id`, value)
+                }
                 placeholder={`Select ${locationType}...`}
                 emptyMessage={`No ${locationType} found`}
               />
@@ -309,9 +330,10 @@ function AllocationFields({ lineIndex, control, register, watch, setValue, wareh
               <Input
                 type="number"
                 step="0.01"
-                placeholder="0.00"
                 className="w-24"
-                {...register(`lines.${lineIndex}.allocations.${allocIndex}.quantity`, { required: true })}
+                {...register(`lines.${lineIndex}.allocations.${allocIndex}.quantity`, {
+                  required: true,
+                })}
               />
             </div>
 
@@ -321,7 +343,6 @@ function AllocationFields({ lineIndex, control, register, watch, setValue, wareh
               variant="ghost"
               onClick={() => remove(allocIndex)}
               disabled={fields.length === 1}
-              className="mb-0"
             >
               <Trash2 className="h-4 w-4" />
             </Button>

@@ -1,9 +1,15 @@
 "use client"
 
-import type React from "react"
 import { useEffect, useState } from "react"
+import { useForm } from "react-hook-form"
+import type { AxiosError } from "axios"
+
 import { useCreateCategory, useUpdateCategory, useCategories } from "@/lib/hooks/use-categories"
 import { useAttributeSets } from "@/lib/hooks/use-attribute-sets"
+import { parseApiError } from "@/lib/api/parse-api-error"
+import { showApiErrorToast } from "@/lib/api/show-api-error-toast"
+import { useToast } from "@/hooks/use-toast"
+
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -15,9 +21,14 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-// import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import type { Category } from "@/lib/types/master-data"
+
+type CategoryFormValues = {
+  name: string
+  parent_id: string | null
+  attribute_set_id: string | null
+}
 
 interface CategoryFormDialogProps {
   category: Category | null
@@ -26,63 +37,80 @@ interface CategoryFormDialogProps {
 }
 
 export function CategoryFormDialog({ category, open, onOpenChange }: CategoryFormDialogProps) {
-  const [formData, setFormData] = useState({
-    name: "",
-    // description: "",
-    parent_id: null,
-    attribute_set_id: null,
-  })
-
+  const toast = useToast()
   const { data: categories } = useCategories()
   const { data: attributeSets } = useAttributeSets()
   const createMutation = useCreateCategory()
   const updateMutation = useUpdateCategory()
 
+  const {
+    register,
+    handleSubmit,
+    reset,
+    setError,
+    formState: { errors },
+  } = useForm<CategoryFormValues>({
+    defaultValues: {
+      name: "",
+      parent_id: null,
+      attribute_set_id: null,
+    },
+  })
+
+  const [formError, setFormError] = useState<string | null>(null)
+
   useEffect(() => {
+    setFormError(null)
+
     if (category) {
-      setFormData({
+      reset({
         name: category.name,
-        // description: category.description || "",
         parent_id: category.parent_id || null,
         attribute_set_id: category.attribute_set_id || null,
       })
     } else {
-      setFormData({
+      reset({
         name: "",
-        // description: "",
         parent_id: null,
         attribute_set_id: null,
       })
     }
-  }, [category, open])
+  }, [category, open, reset])
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
+  const onSubmit = (values: CategoryFormValues) => {
+    setFormError(null)
 
     const payload = {
-      name: formData.name,
-      // description: formData.description || undefined,
-      parent_id: formData.parent_id,
-      attribute_set_id: formData.attribute_set_id,
+      name: values.name,
+      parent_id: values.parent_id,
+      attribute_set_id: values.attribute_set_id,
     }
 
-    if (category) {
-      updateMutation.mutate(
-        { id: category.id, data: payload },
-        {
-          onSuccess: () => {
-            onOpenChange(false)
-          },
-        },
-      )
-    } else {
-      createMutation.mutate(payload, {
-        onSuccess: () => {
-          onOpenChange(false)
-        },
+    const action = category
+      ? updateMutation.mutateAsync({ id: category.id, data: payload })
+      : createMutation.mutateAsync(payload)
+
+    action
+      .then(() => {
+        toast.success(category ? "Category updated" : "Category created")
+        onOpenChange(false)
       })
-    }
+      .catch((e: AxiosError) => {
+        const parsed = parseApiError(e)
+
+        if (parsed.type === "validation") {
+          Object.entries(parsed.fieldErrors).forEach(([field, message]) => {
+            setError(field as keyof CategoryFormValues, { message })
+          })
+          if (parsed.formError) setFormError(parsed.formError)
+          return
+        }
+
+        showApiErrorToast(parsed, toast)
+      })
   }
+
+  const isPending = createMutation.isPending || updateMutation.isPending
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -93,33 +121,33 @@ export function CategoryFormDialog({ category, open, onOpenChange }: CategoryFor
             {category ? "Update category information" : "Add a new category to the system"}
           </DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
+
+        {formError && (
+          <div className="rounded-md border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">
+            {formError}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="name">Name</Label>
-            <Input
-              id="name"
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              required
-            />
+            <Input id="name" {...register("name")} />
+            {errors.name?.message && (
+              <p className="text-sm text-destructive">{errors.name.message}</p>
+            )}
           </div>
-          {/* <div className="space-y-2">
-            <Label htmlFor="description">Description</Label>
-            <Textarea
-              id="description"
-              value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              rows={3}
-            />
-          </div> */}
+
           <div className="space-y-2">
             <Label htmlFor="parent_id">Parent Category (Optional)</Label>
-            <Select value={formData.parent_id} onValueChange={(value) => setFormData({ ...formData, parent_id: value })}>
+            <Select
+              value={category?.parent_id || "none"}
+              onValueChange={(v) => reset((s) => ({ ...s, parent_id: v === "none" ? null : v }))}
+            >
               <SelectTrigger>
                 <SelectValue placeholder="Select parent category" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value={null}>None (Main Category)</SelectItem>
+                <SelectItem value="none">None (Main Category)</SelectItem>
                 {categories
                   ?.filter((c) => c.id !== category?.id)
                   .map((c) => (
@@ -130,11 +158,14 @@ export function CategoryFormDialog({ category, open, onOpenChange }: CategoryFor
               </SelectContent>
             </Select>
           </div>
+
           <div className="space-y-2">
             <Label htmlFor="attribute_set_id">Attribute Set (Optional)</Label>
             <Select
-              value={formData.attribute_set_id || "none"}
-              onValueChange={(value) => setFormData({ ...formData, attribute_set_id: value === "none" ? null : value })}
+              value={category?.attribute_set_id || "none"}
+              onValueChange={(v) =>
+                reset((s) => ({ ...s, attribute_set_id: v === "none" ? null : v }))
+              }
             >
               <SelectTrigger>
                 <SelectValue placeholder="Select attribute set" />
@@ -148,14 +179,17 @@ export function CategoryFormDialog({ category, open, onOpenChange }: CategoryFor
                 ))}
               </SelectContent>
             </Select>
-            <p className="text-sm text-muted-foreground">Products in this category will use these attributes</p>
+            <p className="text-sm text-muted-foreground">
+              Products in this category will use these attributes
+            </p>
           </div>
+
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending}>
-              {createMutation.isPending || updateMutation.isPending ? "Saving..." : category ? "Update" : "Create"}
+            <Button type="submit" disabled={isPending}>
+              {isPending ? "Saving..." : category ? "Update" : "Create"}
             </Button>
           </DialogFooter>
         </form>

@@ -18,6 +18,10 @@ import { UnitFormDialog } from "./unit-form-dialog"
 import { ConfirmDeleteDialog } from "@/components/shared/confirm-delete-dialog"
 import type { Unit } from "@/lib/types/master-data"
 import { useAuth } from "@/lib/hooks/use-auth"
+import { parseApiError } from "@/lib/api/parse-api-error"
+import { showApiErrorToast } from "@/lib/api/show-api-error-toast"
+import { useToast } from "@/hooks/use-toast"
+import { AxiosError } from "axios"
 
 export function UnitTable() {
   const [search, setSearch] = useState("")
@@ -29,6 +33,7 @@ export function UnitTable() {
   const { hasPermission } = useAuth()
   const { data: units, isLoading } = useUnits()
   const deleteMutation = useDeleteUnit()
+  const toast = useToast()
 
   const filteredUnits = units?.filter(
     (unit) =>
@@ -46,9 +51,17 @@ export function UnitTable() {
   }
 
   const confirmDelete = () => {
-    if (unitToDelete) {
-      deleteMutation.mutate(unitToDelete.id)
-    }
+    if (!unitToDelete) return
+
+    deleteMutation.mutate(unitToDelete.id, {
+      onSuccess: () => {
+        toast.success("Unit deleted", "The unit was deleted successfully.")
+        setUnitToDelete(null)
+      },
+      onError: (e:AxiosError) => {
+        showApiErrorToast(parseApiError(e), toast, "Failed to delete unit.")
+      },
+    })
   }
 
   const itemsPerPage = 10

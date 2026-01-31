@@ -1,9 +1,14 @@
+"use client"
+
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import type { AxiosError } from "axios"
 import { attributeSetService } from "@/lib/services/attribute-set.service"
 import type {
   CreateAttributeSetRequest,
   UpdateAttributeSetRequest,
   CreateSetItemRequest,
+  AttributeSet,
+  SetItem,
 } from "@/lib/types/master-data"
 
 // Get all attribute sets
@@ -28,8 +33,8 @@ export function useAttributeSet(id: string) {
 export function useCreateAttributeSet() {
   const queryClient = useQueryClient()
 
-  return useMutation({
-    mutationFn: (data: CreateAttributeSetRequest) => attributeSetService.createAttributeSet(data),
+  return useMutation<AttributeSet, AxiosError, CreateAttributeSetRequest>({
+    mutationFn: (data) => attributeSetService.createAttributeSet(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["attribute-sets"] })
     },
@@ -40,8 +45,12 @@ export function useCreateAttributeSet() {
 export function useUpdateAttributeSet() {
   const queryClient = useQueryClient()
 
-  return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: UpdateAttributeSetRequest }) =>
+  return useMutation<
+    AttributeSet,
+    AxiosError,
+    { id: string; data: UpdateAttributeSetRequest }
+  >({
+    mutationFn: ({ id, data }) =>
       attributeSetService.updateAttributeSet(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["attribute-sets"] })
@@ -53,8 +62,8 @@ export function useUpdateAttributeSet() {
 export function useDeleteAttributeSet() {
   const queryClient = useQueryClient()
 
-  return useMutation({
-    mutationFn: (id: string) => attributeSetService.deleteAttributeSet(id),
+  return useMutation<void, AxiosError, string>({
+    mutationFn: (id) => attributeSetService.deleteAttributeSet(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["attribute-sets"] })
     },
@@ -74,8 +83,8 @@ export function useSetItems(setId: string) {
 export function useAddSetItem(setId: string) {
   const queryClient = useQueryClient()
 
-  return useMutation({
-    mutationFn: (data: CreateSetItemRequest) => attributeSetService.addSetItem(setId, data),
+  return useMutation<SetItem, AxiosError, CreateSetItemRequest>({
+    mutationFn: (data) => attributeSetService.addSetItem(setId, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["attribute-sets", setId, "items"] })
       queryClient.invalidateQueries({ queryKey: ["attribute-sets", setId] })
@@ -88,8 +97,8 @@ export function useAddSetItem(setId: string) {
 export function useRemoveSetItem(setId: string) {
   const queryClient = useQueryClient()
 
-  return useMutation({
-    mutationFn: (itemId: string) => attributeSetService.removeSetItem(setId, itemId),
+  return useMutation<void, AxiosError, string>({
+    mutationFn: (itemId) => attributeSetService.removeSetItem(setId, itemId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["attribute-sets", setId, "items"] })
       queryClient.invalidateQueries({ queryKey: ["attribute-sets", setId] })
@@ -102,8 +111,8 @@ export function useRemoveSetItem(setId: string) {
 export function useUpdateSetItemOrder(setId: string) {
   const queryClient = useQueryClient()
 
-  return useMutation({
-    mutationFn: ({ itemId, sortOrder }: { itemId: string; sortOrder: number }) =>
+  return useMutation<void, AxiosError, { itemId: string; sortOrder: number }>({
+    mutationFn: ({ itemId, sortOrder }) =>
       attributeSetService.updateSetItemOrder(setId, itemId, sortOrder),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["attribute-sets", setId, "items"] })
@@ -115,8 +124,9 @@ export function useUpdateSetItemOrder(setId: string) {
 export function useBulkAddSetItems(setId: string) {
   const queryClient = useQueryClient()
 
-  return useMutation({
-    mutationFn: (attributeIds: string[]) => attributeSetService.bulkAddSetItems(setId, attributeIds),
+  return useMutation<SetItem[], AxiosError, string[]>({
+    mutationFn: (attributeIds) =>
+      attributeSetService.bulkAddSetItems(setId, attributeIds),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["attribute-sets", setId, "items"] })
       queryClient.invalidateQueries({ queryKey: ["attribute-sets", setId] })
@@ -129,8 +139,9 @@ export function useBulkAddSetItems(setId: string) {
 export function useBulkRemoveSetItems(setId: string) {
   const queryClient = useQueryClient()
 
-  return useMutation({
-    mutationFn: (itemIds: string[]) => attributeSetService.bulkRemoveSetItems(setId, itemIds),
+  return useMutation<void, AxiosError, string[]>({
+    mutationFn: (itemIds) =>
+      attributeSetService.bulkRemoveSetItems(setId, itemIds),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["attribute-sets", setId, "items"] })
       queryClient.invalidateQueries({ queryKey: ["attribute-sets", setId] })

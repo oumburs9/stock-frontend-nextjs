@@ -1,8 +1,9 @@
 "use client"
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import type { AxiosError } from "axios"
 import { productService } from "@/lib/services/product.service"
-import type { CreateProductRequest, UpdateProductRequest } from "@/lib/types/master-data"
+import type { CreateProductRequest, UpdateProductRequest, Product } from "@/lib/types/master-data"
 
 export function useProducts(params?: { search?: string; category_id?: string; brand_id?: string; unit_id?: string }) {
   return useQuery({
@@ -35,8 +36,8 @@ export function useProduct(id: string | null) {
 export function useCreateProduct() {
   const queryClient = useQueryClient()
 
-  return useMutation({
-    mutationFn: (data: CreateProductRequest) => productService.createProduct(data),
+  return useMutation<Product, AxiosError, CreateProductRequest>({
+    mutationFn: (data) => productService.createProduct(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["products"] })
     },
@@ -46,8 +47,8 @@ export function useCreateProduct() {
 export function useUpdateProduct() {
   const queryClient = useQueryClient()
 
-  return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: UpdateProductRequest }) => productService.updateProduct(id, data),
+  return useMutation<void, AxiosError, { id: string; data: UpdateProductRequest }>({
+    mutationFn: ({ id, data }) => productService.updateProduct(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["products"] })
     },
@@ -57,8 +58,8 @@ export function useUpdateProduct() {
 export function useDeleteProduct() {
   const queryClient = useQueryClient()
 
-  return useMutation({
-    mutationFn: (id: string) => productService.deleteProduct(id),
+  return useMutation<void, AxiosError, string>({
+    mutationFn: (id) => productService.deleteProduct(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["products"] })
     },

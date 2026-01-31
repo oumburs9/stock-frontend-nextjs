@@ -2,17 +2,24 @@
 
 import { useState } from "react"
 import { useForm, useFieldArray } from "react-hook-form"
+import type { AxiosError } from "axios"
+
 import { useReceivePurchaseOrder } from "@/lib/hooks/use-purchase-orders"
 import { useWarehouses } from "@/lib/hooks/use-warehouses"
 import { useShops } from "@/lib/hooks/use-shops"
 import { useProducts } from "@/lib/hooks/use-products"
+
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Checkbox } from "@/components/ui/checkbox"
-import { useToast } from "@/hooks/use-toast"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { SearchableCombobox } from "@/components/shared/searchable-combobox"
+
+import { useToast } from "@/hooks/use-toast"
+import { parseApiError } from "@/lib/api/parse-api-error"
+import { showApiErrorToast } from "@/lib/api/show-api-error-toast"
+
 import type { PurchaseOrder, ReceivePurchaseOrderRequest } from "@/lib/types/purchase"
 import { useAuth } from "@/lib/hooks/use-auth"
 
@@ -23,20 +30,27 @@ interface PurchaseOrderReceiveDialogProps {
   selectedItemId?: string | null
 }
 
+type FormValues = ReceivePurchaseOrderRequest & {
+  selectedItems: boolean[]
+}
+
 export function PurchaseOrderReceiveDialog({
   purchaseOrder,
   open,
   onOpenChange,
   selectedItemId,
 }: PurchaseOrderReceiveDialogProps) {
-  const { toast } = useToast()
+  const toast = useToast()
   const receiveMutation = useReceivePurchaseOrder()
+
   const { data: warehouses } = useWarehouses()
   const { data: shops } = useShops()
   const { data: products } = useProducts()
+  const { hasPermission } = useAuth()
+
   const [showPostings, setShowPostings] = useState(false)
   const [postings, setPostings] = useState<any>(null)
-  const { hasPermission } = useAuth()
+  const [formError, setFormError] = useState<string | null>(null)
 
   const getProductName = (productId: string) => {
     const product = products?.find((p) => p.id === productId)
@@ -48,11 +62,14 @@ export function PurchaseOrderReceiveDialog({
     handleSubmit,
     watch,
     setValue,
+    setError,
     control,
     formState: { errors },
-  } = useForm<ReceivePurchaseOrderRequest & { selectedItems: boolean[] }>({
+  } = useForm<FormValues>({
     defaultValues: {
-      selectedItems: purchaseOrder.items.map((item) => (selectedItemId ? item.id === selectedItemId : true)),
+      selectedItems: purchaseOrder.items.map((item) =>
+        selectedItemId ? item.id === selectedItemId : true,
+      ),
       lines: purchaseOrder.items.map((item) => ({
         purchase_order_item_id: item.id,
         quantity_received: item.quantity_remaining,
@@ -67,55 +84,41 @@ export function PurchaseOrderReceiveDialog({
     name: "lines",
   })
 
-  const onSubmit = async (data: ReceivePurchaseOrderRequest & { selectedItems: boolean[] }) => {
+  const onSubmit = (data: FormValues) => {
+    setFormError(null)
+
     const selectedLines = data.lines.filter((_, index) => data.selectedItems[index])
 
-    if (selectedLines.length === 0) {
-      toast({
-        title: "No items selected",
-        description: "Please select at least one item to receive",
-        variant: "destructive",
-      })
-      return
-    }
-
-    try {
-      const result = await receiveMutation.mutateAsync({
+    receiveMutation
+      .mutateAsync({
         id: purchaseOrder.id,
         data: { lines: selectedLines },
       })
-      setPostings(result)
-      setShowPostings(true)
-      toast({
-        title: "Success",
-        description: `Successfully received ${selectedLines.length} item(s)`,
+      .then((result) => {
+        setPostings(result)
+        setShowPostings(true)
+        toast.success("Purchase order received")
       })
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.response?.data?.message || "Failed to receive purchase order",
-        variant: "destructive",
+      .catch((e: AxiosError) => {
+        const parsed = parseApiError(e)
+
+        if (parsed.type === "validation") {
+          Object.entries(parsed.fieldErrors).forEach(([field, message]) => {
+            setError(field as any, { message })
+          })
+          if (parsed.formError) setFormError(parsed.formError)
+          return
+        }
+
+        showApiErrorToast(parsed, toast, "Failed to receive purchase order.")
       })
-    }
   }
 
   const getLocationOptions = (index: number) => {
     const locationType = watch(`lines.${index}.location_type`)
-    if (locationType === "warehouse") {
-      return (
-        warehouses?.map((w) => ({
-          value: w.id,
-          label: w.name,
-        })) || []
-      )
-    } else {
-      return (
-        shops?.map((s) => ({
-          value: s.id,
-          label: s.name,
-        })) || []
-      )
-    }
+    return locationType === "warehouse"
+      ? warehouses?.map((w) => ({ value: w.id, label: w.name })) || []
+      : shops?.map((s) => ({ value: s.id, label: s.name })) || []
   }
 
   if (showPostings && postings) {
@@ -125,39 +128,45 @@ export function PurchaseOrderReceiveDialog({
           <DialogHeader>
             <DialogTitle>Receiving Complete - Stock Postings</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4">
-            <div className="rounded-md border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Product</TableHead>
-                    <TableHead>Quantity</TableHead>
-                    <TableHead>Location</TableHead>
-                    <TableHead>Batch ID</TableHead>
-                    <TableHead>Stock Before</TableHead>
-                    <TableHead>Stock After</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {postings.postings.map((posting: any, index: number) => (
-                    <TableRow key={index}>
-                      <TableCell>{getProductName(posting.product_id)}</TableCell>
-                      <TableCell>{posting.received_quantity}</TableCell>
-                      <TableCell>
-                        <div className="text-sm">
-                          <div className="font-medium">{posting.location.type}</div>
-                          <div className="text-xs text-muted-foreground">{posting.location.id.slice(0, 8)}...</div>
+
+          <div className="rounded-md border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Product</TableHead>
+                  <TableHead>Quantity</TableHead>
+                  <TableHead>Location</TableHead>
+                  <TableHead>Batch ID</TableHead>
+                  <TableHead>Stock Before</TableHead>
+                  <TableHead>Stock After</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {postings.postings.map((posting: any, index: number) => (
+                  <TableRow key={index}>
+                    <TableCell>{getProductName(posting.product_id)}</TableCell>
+                    <TableCell>{posting.received_quantity}</TableCell>
+                    <TableCell>
+                      <div className="text-sm">
+                        <div className="font-medium">{posting.location.type}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {posting.location.id.slice(0, 8)}...
                         </div>
-                      </TableCell>
-                      <TableCell className="font-mono text-xs">{posting.batch_id.slice(0, 8)}...</TableCell>
-                      <TableCell>{posting.stock_posting.beforeQuantity}</TableCell>
-                      <TableCell className="font-medium">{posting.stock_posting.afterQuantity}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+                      </div>
+                    </TableCell>
+                    <TableCell className="font-mono text-xs">
+                      {posting.batch_id.slice(0, 8)}...
+                    </TableCell>
+                    <TableCell>{posting.stock_posting.beforeQuantity}</TableCell>
+                    <TableCell className="font-medium">
+                      {posting.stock_posting.afterQuantity}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           </div>
+
           <DialogFooter>
             <Button onClick={() => onOpenChange(false)}>Close</Button>
           </DialogFooter>
@@ -172,9 +181,18 @@ export function PurchaseOrderReceiveDialog({
         <DialogHeader>
           <DialogTitle>Receive Purchase Order: {purchaseOrder.code}</DialogTitle>
           <p className="text-sm text-muted-foreground">
-            {selectedItemId ? "Receiving selected product" : "Select which products to receive and specify quantities"}
+            {selectedItemId
+              ? "Receiving selected product"
+              : "Select which products to receive and specify quantities"}
           </p>
         </DialogHeader>
+
+        {formError && (
+          <div className="rounded-md border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">
+            {formError}
+          </div>
+        )}
+
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="rounded-md border">
             <Table>
@@ -191,49 +209,48 @@ export function PurchaseOrderReceiveDialog({
               </TableHeader>
               <TableBody>
                 {purchaseOrder.items.map((item, index) => {
-                  const remaining = Number.parseFloat(item.quantity_remaining || "0").toFixed(2)
                   const isSelected = watch(`selectedItems.${index}`)
                   return (
                     <TableRow key={item.id} className={!isSelected ? "opacity-50" : ""}>
                       <TableCell>
                         <Checkbox
                           checked={isSelected}
-                          onCheckedChange={(checked) => setValue(`selectedItems.${index}`, checked as boolean)}
+                          onCheckedChange={(checked) =>
+                            setValue(`selectedItems.${index}`, checked as boolean)
+                          }
                         />
                       </TableCell>
+
                       <TableCell>{getProductName(item.product_id)}</TableCell>
                       <TableCell className="text-right">{item.quantity}</TableCell>
-                      <TableCell className="text-right font-medium text-primary">{remaining}</TableCell>
+                      <TableCell className="text-right font-medium text-primary">
+                        {item.quantity_remaining}
+                      </TableCell>
+
                       <TableCell>
                         <Input
                           type="number"
                           step="0.01"
                           className="w-28"
                           disabled={!isSelected}
-                          {...register(`lines.${index}.quantity_received`, {
-                            required: isSelected ? "Required" : false,
-                            validate: (value) => {
-                              if (!isSelected) return true
-                              const val = Number.parseFloat(value)
-                              const rem = Number.parseFloat(remaining)
-                              if (val > rem) return `Cannot exceed remaining qty (${rem})`
-                              if (val <= 0) return "Must be greater than 0"
-                              return true
-                            },
-                          })}
+                          {...register(`lines.${index}.quantity_received`)}
                         />
-                        {errors.lines?.[index]?.quantity_received && (
-                          <p className="text-xs text-destructive mt-1">
+                        {errors.lines?.[index]?.quantity_received?.message && (
+                          <p className="text-sm text-destructive">
                             {errors.lines[index]?.quantity_received?.message}
                           </p>
                         )}
                       </TableCell>
+
                       <TableCell>
                         <select
                           disabled={!isSelected}
-                          {...register(`lines.${index}.location_type`, { required: isSelected ? "Required" : false })}
+                          {...register(`lines.${index}.location_type`)}
                           onChange={(e) => {
-                            setValue(`lines.${index}.location_type`, e.target.value as "warehouse" | "shop")
+                            setValue(
+                              `lines.${index}.location_type`,
+                              e.target.value as "warehouse" | "shop",
+                            )
                             setValue(`lines.${index}.location_id`, "")
                           }}
                           className="px-2 py-1 text-sm border border-input rounded-md bg-background disabled:opacity-50"
@@ -242,11 +259,14 @@ export function PurchaseOrderReceiveDialog({
                           <option value="shop">Shop</option>
                         </select>
                       </TableCell>
+
                       <TableCell>
                         <div className="w-48">
                           <SearchableCombobox
                             value={watch(`lines.${index}.location_id`)}
-                            onChange={(value) => setValue(`lines.${index}.location_id`, value)}
+                            onChange={(value) =>
+                              setValue(`lines.${index}.location_id`, value)
+                            }
                             options={getLocationOptions(index)}
                             placeholder="Select location..."
                             searchPlaceholder="Search..."
@@ -254,8 +274,10 @@ export function PurchaseOrderReceiveDialog({
                             disabled={!isSelected}
                           />
                         </div>
-                        {errors.lines?.[index]?.location_id && (
-                          <p className="text-xs text-destructive mt-1">{errors.lines[index]?.location_id?.message}</p>
+                        {errors.lines?.[index]?.location_id?.message && (
+                          <p className="text-sm text-destructive">
+                            {errors.lines[index]?.location_id?.message}
+                          </p>
                         )}
                       </TableCell>
                     </TableRow>
@@ -269,7 +291,10 @@ export function PurchaseOrderReceiveDialog({
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={receiveMutation.isPending || !hasPermission("purchase-order:receive")}>
+            <Button
+              type="submit"
+              disabled={receiveMutation.isPending || !hasPermission("purchase-order:receive")}
+            >
               {receiveMutation.isPending ? "Receiving..." : "Receive Selected Items"}
             </Button>
           </DialogFooter>

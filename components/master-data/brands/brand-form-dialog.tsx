@@ -2,20 +2,21 @@
 
 import type React from "react"
 import { useEffect, useState } from "react"
+import { useForm } from "react-hook-form"
+import type { AxiosError } from "axios"
 import { useCreateBrand, useUpdateBrand } from "@/lib/hooks/use-brands"
+import { parseApiError } from "@/lib/api/parse-api-error"
+import { showApiErrorToast } from "@/lib/api/show-api-error-toast"
+import { useToast } from "@/hooks/use-toast"
 import { Button } from "@/components/ui/button"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
 import type { Brand } from "@/lib/types/master-data"
+
+type BrandFormValues = {
+  name: string
+}
 
 interface BrandFormDialogProps {
   brand: Brand | null
@@ -24,34 +25,36 @@ interface BrandFormDialogProps {
 }
 
 export function BrandFormDialog({ brand, open, onOpenChange }: BrandFormDialogProps) {
-  const [formData, setFormData] = useState({
-    name: "",
-    // description: "",
-  })
+  const [formError, setFormError] = useState<string | null>(null)
 
+  const { success, error, warning } = useToast()
   const createMutation = useCreateBrand()
   const updateMutation = useUpdateBrand()
 
-  useEffect(() => {
-    if (brand) {
-      setFormData({
-        name: brand.name,
-        // description: brand.description || "",
-      })
-    } else {
-      setFormData({
-        name: "",
-        // description: "",
-      })
-    }
-  }, [brand, open])
+  const {
+    register,
+    handleSubmit,
+    reset,
+    setError,
+    formState: { errors },
+  } = useForm<BrandFormValues>({
+    defaultValues: { name: "" },
+  })
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
+  useEffect(() => {
+    setFormError(null)
+    if (brand) {
+      reset({ name: brand.name })
+    } else {
+      reset({ name: "" })
+    }
+  }, [brand, open, reset])
+
+  const onSubmit = (values: BrandFormValues) => {
+    setFormError(null)
 
     const payload = {
-      name: formData.name,
-      // description: formData.description || undefined,
+      name: values.name,
     }
 
     if (brand) {
@@ -59,18 +62,50 @@ export function BrandFormDialog({ brand, open, onOpenChange }: BrandFormDialogPr
         { id: brand.id, data: payload },
         {
           onSuccess: () => {
+            success("Brand updated", "The brand was updated successfully.")
             onOpenChange(false)
+          },
+          onError: (e: unknown) => {
+            const axiosError = e as AxiosError
+            const parsed = parseApiError(axiosError)
+
+            if (parsed.type === "validation") {
+              Object.entries(parsed.fieldErrors).forEach(([field, message]) => {
+                setError(field as keyof BrandFormValues, { message })
+              })
+              if (parsed.formError) setFormError(parsed.formError)
+              return
+            }
+
+            showApiErrorToast(parsed, { error, warning }, "Failed to update brand.")
           },
         },
       )
-    } else {
-      createMutation.mutate(payload, {
-        onSuccess: () => {
-          onOpenChange(false)
-        },
-      })
+      return
     }
+
+    createMutation.mutate(payload, {
+      onSuccess: () => {
+        success("Brand created", "The brand was created successfully.")
+        onOpenChange(false)
+      },
+      onError: (e: AxiosError) => {
+        const parsed = parseApiError(e)
+
+        if (parsed.type === "validation") {
+          Object.entries(parsed.fieldErrors).forEach(([field, message]) => {
+            setError(field as keyof BrandFormValues, { message })
+          })
+          if (parsed.formError) setFormError(parsed.formError)
+          return
+        }
+
+        showApiErrorToast(parsed, { error, warning }, "Failed to create brand.")
+      },
+    })
   }
+
+  const isPending = createMutation.isPending || updateMutation.isPending
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -79,31 +114,29 @@ export function BrandFormDialog({ brand, open, onOpenChange }: BrandFormDialogPr
           <DialogTitle>{brand ? "Edit Brand" : "Create Brand"}</DialogTitle>
           <DialogDescription>{brand ? "Update brand information" : "Add a new brand to the system"}</DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
+
+        {formError && (
+          <div className="rounded-md border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">
+            {formError}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="name">Name</Label>
             <Input
               id="name"
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              required
+              {...register("name")}
             />
+            {errors.name?.message && <p className="text-sm text-destructive">{errors.name.message}</p>}
           </div>
-          {/* <div className="space-y-2">
-            <Label htmlFor="description">Description</Label>
-            <Textarea
-              id="description"
-              value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              rows={3}
-            />
-          </div> */}
+
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending}>
-              {createMutation.isPending || updateMutation.isPending ? "Saving..." : brand ? "Update" : "Create"}
+            <Button type="submit" disabled={isPending}>
+              {isPending ? "Saving..." : brand ? "Update" : "Create"}
             </Button>
           </DialogFooter>
         </form>

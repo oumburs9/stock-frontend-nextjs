@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
+import type { AxiosError } from "axios"
 import { usePricingRules, useDeletePricingRule, useUpdatePricingRule } from "@/lib/hooks/use-sales"
 import type { PricingRule } from "@/lib/types/sales"
 import { Button } from "@/components/ui/button"
@@ -29,9 +30,13 @@ import { MoreHorizontal, Pencil, Trash2, Power, PowerOff, ChevronLeft, ChevronRi
 import { PricingRuleFormDialog } from "./pricing-rule-form-dialog"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useAuth } from "@/lib/hooks/use-auth"
+import { useToast } from "@/hooks/use-toast"
+import { parseApiError } from "@/lib/api/parse-api-error"
+import { showApiErrorToast } from "@/lib/api/show-api-error-toast"
 
 export function PricingRulesTable() {
   const router = useRouter()
+  const toast = useToast()
   const { data: rules, isLoading } = usePricingRules()
   const deleteRule = useDeletePricingRule()
   const updateRule = useUpdatePricingRule()
@@ -46,15 +51,31 @@ export function PricingRulesTable() {
   const paginatedRules = rules?.slice(startIndex, startIndex + itemsPerPage)
   const totalPages = Math.ceil((rules?.length || 0) / itemsPerPage)
 
-  const handleToggleActive = (rule: PricingRule) => {
-    updateRule.mutate({ id: rule.id, data: { isActive: !rule.is_active } })
+  const handleToggleActive = async (rule: PricingRule) => {
+    try {
+      await updateRule.mutateAsync({
+        id: rule.id,
+        data: { isActive: !rule.is_active },
+      })
+      toast.success(`Pricing rule ${rule.is_active ? "deactivated" : "activated"} successfully`)
+    } catch (e) {
+      const parsed = parseApiError(e as AxiosError)
+      if (parsed.type === "validation") return
+      showApiErrorToast(parsed, toast, "Failed to update pricing rule status")
+    }
   }
 
-  const handleDelete = () => {
-    if (deletingRuleId) {
-      deleteRule.mutate(deletingRuleId, {
-        onSuccess: () => setDeletingRuleId(null),
-      })
+  const handleDelete = async () => {
+    if (!deletingRuleId) return
+
+    try {
+      await deleteRule.mutateAsync(deletingRuleId)
+      toast.success("Pricing rule deleted successfully")
+      setDeletingRuleId(null)
+    } catch (e) {
+      const parsed = parseApiError(e as AxiosError)
+      if (parsed.type === "validation") return
+      showApiErrorToast(parsed, toast, "Failed to delete pricing rule")
     }
   }
 
@@ -158,29 +179,34 @@ export function PricingRulesTable() {
                     <DropdownMenuContent align="end">
                       <DropdownMenuLabel>Actions</DropdownMenuLabel>
                       <DropdownMenuSeparator />
-                      {hasPermission("pricing-rule:update") && (<DropdownMenuItem onClick={() => setEditingRule(rule)}>
-                        <Pencil className="mr-2 h-4 w-4" />
-                        Edit
-                      </DropdownMenuItem>)}
-                      {/* {hasPermission("pricing-rule:update-status") && ( */}
+                      {hasPermission("pricing-rule:update") && (
+                        <DropdownMenuItem onClick={() => setEditingRule(rule)}>
+                          <Pencil className="mr-2 h-4 w-4" />
+                          Edit
+                        </DropdownMenuItem>
+                      )}
                       {hasPermission("pricing-rule:update") && (
                         <DropdownMenuItem onClick={() => handleToggleActive(rule)}>
-                        {rule.is_active ? (
-                          <>
-                            <PowerOff className="mr-2 h-4 w-4" />
-                            Deactivate
-                          </>
-                        ) : (
-                          <>
-                            <Power className="mr-2 h-4 w-4" />
-                            Activate
-                          </>
-                        )}
-                      </DropdownMenuItem>)}
+                          {rule.is_active ? (
+                            <>
+                              <PowerOff className="mr-2 h-4 w-4" />
+                              Deactivate
+                            </>
+                          ) : (
+                            <>
+                              <Power className="mr-2 h-4 w-4" />
+                              Activate
+                            </>
+                          )}
+                        </DropdownMenuItem>
+                      )}
                       {hasPermission("pricing-rule:delete") && (
                         <>
                           <DropdownMenuSeparator />
-                          <DropdownMenuItem onClick={() => setDeletingRuleId(rule.id)} className="text-destructive">
+                          <DropdownMenuItem
+                            onClick={() => setDeletingRuleId(rule.id)}
+                            className="text-destructive"
+                          >
                             <Trash2 className="mr-2 h-4 w-4" />
                             Delete
                           </DropdownMenuItem>

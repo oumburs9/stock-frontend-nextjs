@@ -1,9 +1,14 @@
 "use client"
 
-import type React from "react"
-
 import { useEffect, useState } from "react"
+import { useForm } from "react-hook-form"
+import type { AxiosError } from "axios"
+
 import { useCreatePermission, useUpdatePermission } from "@/lib/hooks/use-permissions"
+import { parseApiError } from "@/lib/api/parse-api-error"
+import { showApiErrorToast } from "@/lib/api/show-api-error-toast"
+import { useToast } from "@/hooks/use-toast"
+
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -18,6 +23,11 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import type { Permission } from "@/lib/types/permission"
 
+type PermissionFormValues = {
+  name: string
+  description?: string
+}
+
 interface PermissionFormDialogProps {
   permission: Permission | null
   open: boolean
@@ -25,51 +35,66 @@ interface PermissionFormDialogProps {
 }
 
 export function PermissionFormDialog({ permission, open, onOpenChange }: PermissionFormDialogProps) {
-  const [formData, setFormData] = useState({
-    name: "",
-    description: "",
-  })
-
+  const toast = useToast()
   const createMutation = useCreatePermission()
   const updateMutation = useUpdatePermission()
 
+  const {
+    register,
+    handleSubmit,
+    reset,
+    setError,
+    formState: { errors },
+  } = useForm<PermissionFormValues>({
+    defaultValues: { name: "", description: "" },
+  })
+
+  const [formError, setFormError] = useState<string | null>(null)
+
   useEffect(() => {
+    setFormError(null)
+
     if (permission) {
-      setFormData({
+      reset({
         name: permission.name,
         description: permission.description || "",
       })
     } else {
-      setFormData({
-        name: "",
-        description: "",
-      })
+      reset({ name: "", description: "" })
     }
-  }, [permission, open])
+  }, [permission, open, reset])
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
+  const onSubmit = (values: PermissionFormValues) => {
+    setFormError(null)
 
-    if (permission) {
-      updateMutation.mutate(
-        {
+    const action = permission
+      ? updateMutation.mutateAsync({
           id: permission.id,
-          data: { description: formData.description },
-        },
-        {
-          onSuccess: () => {
-            onOpenChange(false)
-          },
-        },
-      )
-    } else {
-      createMutation.mutate(formData, {
-        onSuccess: () => {
-          onOpenChange(false)
-        },
+          data: { description: values.description },
+        })
+      : createMutation.mutateAsync(values)
+
+    action
+      .then(() => {
+        toast.success(permission ? "Permission updated" : "Permission created")
+        onOpenChange(false)
       })
-    }
+      .catch((e: AxiosError) => {
+        const parsed = parseApiError(e)
+
+        if (parsed.type === "validation") {
+          Object.entries(parsed.fieldErrors).forEach(([field, message]) => {
+            setError(field as keyof PermissionFormValues, { message })
+          })
+          if (parsed.formError) setFormError(parsed.formError)
+          return
+        }
+
+        showApiErrorToast(parsed, toast)
+      })
   }
+
+  const isPending = createMutation.isPending || updateMutation.isPending
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -80,35 +105,51 @@ export function PermissionFormDialog({ permission, open, onOpenChange }: Permiss
             {permission ? "Update permission information" : "Add a new permission to the system"}
           </DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
+
+        {formError && (
+          <div className="rounded-md border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">
+            {formError}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="name">Name</Label>
             <Input
               id="name"
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              placeholder="e.g., stock:transfer"
-              required
+              {...register("name")}
               disabled={!!permission}
+              placeholder="e.g., stock:transfer"
             />
-            {permission && <p className="text-xs text-muted-foreground">Permission names cannot be changed</p>}
+            {permission && (
+              <p className="text-xs text-muted-foreground">
+                Permission names cannot be changed
+              </p>
+            )}
+            {errors.name?.message && (
+              <p className="text-sm text-destructive">{errors.name.message}</p>
+            )}
           </div>
+
           <div className="space-y-2">
             <Label htmlFor="description">Description</Label>
             <Textarea
               id="description"
-              value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              placeholder="Describe what this permission allows..."
               rows={3}
+              {...register("description")}
+              placeholder="Describe what this permission allows..."
             />
+            {errors.description?.message && (
+              <p className="text-sm text-destructive">{errors.description.message}</p>
+            )}
           </div>
+
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending}>
-              {createMutation.isPending || updateMutation.isPending ? "Saving..." : permission ? "Update" : "Create"}
+            <Button type="submit" disabled={isPending}>
+              {isPending ? "Saving..." : permission ? "Update" : "Create"}
             </Button>
           </DialogFooter>
         </form>

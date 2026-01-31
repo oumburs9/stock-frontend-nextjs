@@ -13,6 +13,10 @@ import { usePayable, usePayablePayments } from "@/lib/hooks/use-finance"
 import { usePartners } from "@/lib/hooks/use-partners"
 import { RecordPayablePaymentDialog } from "@/components/finance/payables/record-payable-payment-dialog"
 import { useAuth } from "@/lib/hooks/use-auth"
+import { useShipment } from "@/lib/hooks/use-shipments"
+import { usePurchaseOrder } from "@/lib/hooks/use-purchase-orders"
+import { Separator } from "@/components/ui/separator"
+import { useAgentSalesByPayable } from "@/lib/hooks/use-agent-sales"
 
 export default function PayableDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -23,6 +27,14 @@ export default function PayableDetailPage() {
   const { data: payments } = usePayablePayments(id)
   const { data: partners } = usePartners("supplier")
   const { hasPermission } = useAuth()
+
+  const { data: agentSales } = useAgentSalesByPayable(payable?.id ?? null)
+  const agentSale = agentSales?.[0] ?? null
+
+  const shipmentId = payable?.purchase_shipment_id ?? null
+  const purchaseOrderId = payable?.purchase_order_id ?? null
+  const { data: shipment } = useShipment(shipmentId)
+  const { data: purchaseOrder } = usePurchaseOrder(purchaseOrderId)
 
   if (isLoading) {
     return (
@@ -109,6 +121,127 @@ export default function PayableDetailPage() {
               )}
             </CardContent>
           </Card>
+
+          {shipmentId && shipment && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Related Shipment</CardTitle>
+              </CardHeader>
+
+              <CardContent className="space-y-3">
+                <div className="flex justify-between">
+                  <span className="text-sm text-muted-foreground">Shipment Code</span>
+                  <span className="font-medium">{shipment.code}</span>
+                </div>
+
+                <div className="flex justify-between">
+                  <span className="text-sm text-muted-foreground">Status</span>
+                  <Badge variant="outline">
+                    {shipment.status.replace("_", " ").toUpperCase()}
+                  </Badge>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm text-muted-foreground">Arrival Date</span>
+                  <span className="text-sm">
+                    {shipment.arrival_date
+                      ? new Date(shipment.arrival_date).toLocaleDateString()
+                      : "—"}
+                  </span>
+                </div>
+
+                <Separator />
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    router.push(`/purchase/shipments/${shipmentId}`)
+                  }
+                >
+                  View Shipment Details
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+          {purchaseOrderId && purchaseOrder && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Related Purchase Order</CardTitle>
+              </CardHeader>
+
+              <CardContent className="space-y-3">
+                <div className="flex justify-between">
+                  <span className="text-sm text-muted-foreground">PO Code</span>
+                  <span className="font-medium">{purchaseOrder.code}</span>
+                </div>
+
+                <div className="flex justify-between">
+                  <span className="text-sm text-muted-foreground">Status</span>
+                  <Badge variant="outline">
+                    {purchaseOrder.status.replace("_", " ").toUpperCase()}
+                  </Badge>
+                </div>
+                
+                <div className="flex justify-between">
+                  <span className="text-sm text-muted-foreground">Order Date</span>
+                  <span className="text-sm">
+                    {new Date(purchaseOrder.order_date).toLocaleDateString()}
+                  </span>
+                </div>
+
+                <Separator />
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    router.push(`/purchase/orders/${purchaseOrderId}`)
+                  }
+                >
+                  View Purchase Order
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+
+          {agentSale && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Related Agent Sale</CardTitle>
+              </CardHeader>
+
+              <CardContent className="space-y-3">
+                <div className="flex justify-between">
+                  <span className="text-sm text-muted-foreground">Sale Code</span>
+                  <span className="font-medium">{agentSale.code}</span>
+                </div>
+
+                <div className="flex justify-between">
+                  <span className="text-sm text-muted-foreground">Status</span>
+                  <Badge variant="outline">
+                    {agentSale.status.toUpperCase()}
+                  </Badge>
+                </div>
+
+                <div className="flex justify-between">
+                  <span className="text-sm text-muted-foreground">Sale Date</span>
+                  <span className="text-sm">
+                    {new Date(agentSale.sale_date).toLocaleDateString()}
+                  </span>
+                </div>
+
+                <Separator />
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => router.push(`/agent-sales/${agentSale.id}`)}
+                >
+                  View Agent Sale
+                </Button>
+              </CardContent>
+            </Card>
+          )}
 
           <Card>
             <CardHeader>

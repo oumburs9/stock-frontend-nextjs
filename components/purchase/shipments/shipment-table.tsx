@@ -1,7 +1,19 @@
 "use client"
 
 import { useState, useMemo } from "react"
-import { MoreHorizontal, Plus, Search, X, Eye, Edit, PackageCheck, FileText, XCircle, ChevronLeft, ChevronRight } from "lucide-react"
+import {
+  MoreHorizontal,
+  Plus,
+  Search,
+  X,
+  Eye,
+  Edit,
+  PackageCheck,
+  FileText,
+  XCircle,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -32,6 +44,9 @@ import { useRouter } from "next/navigation"
 import { useShipments, useCloseShipment } from "@/lib/hooks/use-shipments"
 import { usePartners } from "@/lib/hooks/use-partners"
 import { useAuth } from "@/lib/hooks/use-auth"
+import type { AxiosError } from "axios"
+import { parseApiError } from "@/lib/api/parse-api-error"
+import { showApiErrorToast } from "@/lib/api/show-api-error-toast"
 
 const DEMO_SUPPLIER_NAMES: Record<string, string> = {
   "1": "ABC Electronics Corp",
@@ -50,14 +65,20 @@ export function ShipmentTable() {
   const [showCloseConfirm, setShowCloseConfirm] = useState(false)
   const [page, setPage] = useState(1)
   const [selectedForAction, setSelectedForAction] = useState<any>(null)
+
   const router = useRouter()
   const { hasPermission } = useAuth()
-  const { toast } = useToast()
-   const { data: suppliers } = usePartners("supplier")
+  const toast = useToast()
 
-  const { data: shipments = [] } = useShipments({ q: search, status: statusFilter || undefined, type: typeFilter || undefined })
+  const { data: suppliers } = usePartners("supplier")
+  const { data: shipments = [] } = useShipments({
+    q: search,
+    status: statusFilter || undefined,
+    type: typeFilter || undefined,
+  })
+
   const closeMutation = useCloseShipment()
-  
+
   const getSupplierName = (supplierId: string) => {
     const supplier = suppliers?.find((s) => s.id === supplierId)
     return supplier?.name || supplierId.slice(0, 8) + "..."
@@ -66,10 +87,9 @@ export function ShipmentTable() {
   const filteredShipments = useMemo(() => {
     return shipments.map((s: any) => ({
       ...s,
-      supplier_name:  getSupplierName(s.supplier_id),
+      supplier_name: getSupplierName(s.supplier_id),
     }))
   }, [shipments])
-
 
   const getStatusBadge = (status: string) => {
     const variants: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
@@ -100,11 +120,7 @@ export function ShipmentTable() {
 
   const handleClose = (shipment: any) => {
     if (shipment.status !== "received") {
-      toast({
-        title: "Cannot Close",
-        description: "Only fully received shipments can be closed",
-        variant: "destructive",
-      })
+      toast.error("Cannot Close", "Only fully received shipments can be closed")
       return
     }
     setSelectedForAction(shipment)
@@ -115,25 +131,18 @@ export function ShipmentTable() {
     if (!selectedForAction) return
     try {
       await closeMutation.mutateAsync(selectedForAction.id)
-      toast({
-        title: "Success",
-        description: "Shipment closed successfully",
-      })
+      toast.success("Shipment closed", "Shipment closed successfully")
       setShowCloseConfirm(false)
       setSelectedForAction(null)
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to close shipment",
-        variant: "destructive",
-      })
+    } catch (e) {
+      showApiErrorToast(parseApiError(e as AxiosError), toast, "Failed to close shipment")
     }
   }
 
   const itemsPerPage = 10
   const startIndex = (page - 1) * itemsPerPage
-  const paginatedShipments = filteredShipments?.slice(startIndex, startIndex + itemsPerPage)
-  const totalPages = Math.ceil((filteredShipments?.length || 0) / itemsPerPage)
+  const paginatedShipments = filteredShipments.slice(startIndex, startIndex + itemsPerPage)
+  const totalPages = Math.ceil(filteredShipments.length / itemsPerPage)
 
   return (
     <div className="space-y-4">
@@ -156,13 +165,12 @@ export function ShipmentTable() {
           >
             <Plus className="h-4 w-4 mr-2" />
             New Shipment
-          </Button>)}
+          </Button>
+        )}
       </div>
 
       <div className="flex gap-2 flex-wrap items-center">
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-muted-foreground">Filters:</span>
-        </div>
+        <span className="text-sm text-muted-foreground">Filters:</span>
         <select
           value={typeFilter}
           onChange={(e) => setTypeFilter(e.target.value)}
@@ -208,7 +216,7 @@ export function ShipmentTable() {
               <TableHead>Supplier</TableHead>
               <TableHead>Arrival Date</TableHead>
               <TableHead className="text-right">Items</TableHead>
-              <TableHead className="w-[70px]"></TableHead>
+              <TableHead className="w-[70px]" />
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -223,7 +231,9 @@ export function ShipmentTable() {
                 <TableRow key={shipment.id}>
                   <TableCell className="font-mono text-sm font-medium">{shipment.code}</TableCell>
                   <TableCell>
-                    <Badge variant={shipment.type === "import" ? "default" : "secondary"}>{shipment.type}</Badge>
+                    <Badge variant={shipment.type === "import" ? "default" : "secondary"}>
+                      {shipment.type}
+                    </Badge>
                   </TableCell>
                   <TableCell>{getStatusBadge(shipment.status)}</TableCell>
                   <TableCell className="font-medium">{shipment.supplier_name}</TableCell>
@@ -251,20 +261,26 @@ export function ShipmentTable() {
                             Edit
                           </DropdownMenuItem>
                         )}
-                        {hasPermission("purchase-shipment-expense:add") && (<DropdownMenuItem onClick={() => handleAddExpense(shipment)}>
-                          <FileText className="h-4 w-4 mr-2" />
-                          Add Expense
-                        </DropdownMenuItem>)}
-                        {(shipment.status === "draft" || shipment.status === "partially_received") && hasPermission("purchase-shipment:receive") && (
-                          <DropdownMenuItem onClick={() => handleReceive(shipment)}>
-                            <PackageCheck className="h-4 w-4 mr-2" />
-                            Receive
+                        {hasPermission("purchase-shipment-expense:add") && (
+                          <DropdownMenuItem onClick={() => handleAddExpense(shipment)}>
+                            <FileText className="h-4 w-4 mr-2" />
+                            Add Expense
                           </DropdownMenuItem>
                         )}
+                        {(shipment.status === "draft" || shipment.status === "partially_received") &&
+                          hasPermission("purchase-shipment:receive") && (
+                            <DropdownMenuItem onClick={() => handleReceive(shipment)}>
+                              <PackageCheck className="h-4 w-4 mr-2" />
+                              Receive
+                            </DropdownMenuItem>
+                          )}
                         {shipment.status === "received" && hasPermission("purchase-shipment:close") && (
                           <>
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem onClick={() => handleClose(shipment)} className="text-destructive">
+                            <DropdownMenuItem
+                              onClick={() => handleClose(shipment)}
+                              className="text-destructive"
+                            >
                               <XCircle className="h-4 w-4 mr-2" />
                               Close
                             </DropdownMenuItem>
@@ -279,8 +295,8 @@ export function ShipmentTable() {
           </TableBody>
         </Table>
       </div>
-        
-        {filteredShipments && filteredShipments.length > itemsPerPage && (
+
+      {filteredShipments.length > itemsPerPage && (
         <div className="flex items-center justify-between">
           <p className="text-sm text-muted-foreground">
             Showing {startIndex + 1} to {Math.min(startIndex + itemsPerPage, filteredShipments.length)} of{" "}
@@ -319,16 +335,8 @@ export function ShipmentTable() {
 
       {selectedShipment && (
         <>
-          <ReceiveShipmentDialog
-            shipment={selectedShipment}
-            open={showReceiveDialog}
-            onOpenChange={setShowReceiveDialog}
-          />
-          <AddExpenseDialog
-            shipmentId={selectedShipment.id}
-            open={showExpenseDialog}
-            onOpenChange={setShowExpenseDialog}
-          />
+          <ReceiveShipmentDialog shipment={selectedShipment} open={showReceiveDialog} onOpenChange={setShowReceiveDialog} />
+          <AddExpenseDialog shipmentId={selectedShipment.id} open={showExpenseDialog} onOpenChange={setShowExpenseDialog} />
         </>
       )}
 
@@ -339,7 +347,9 @@ export function ShipmentTable() {
             <AlertDialogDescription>
               Are you sure you want to close this shipment? This action cannot be undone.
               {selectedForAction && (
-                <span className="block mt-2 font-semibold text-foreground">Shipment: {selectedForAction.code}</span>
+                <span className="block mt-2 font-semibold text-foreground">
+                  Shipment: {selectedForAction.code}
+                </span>
               )}
             </AlertDialogDescription>
           </AlertDialogHeader>

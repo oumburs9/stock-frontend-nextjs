@@ -208,9 +208,23 @@ export default function InvoiceDetailPage() {
               <FileText className="mr-2 h-4 w-4" />
               View Receivables
             </Button>
-            <Button variant="outline" onClick={() => router.push(`/sales/orders/${invoice.sales_order_id}`)}>
-              View Sales Order
+            {invoice.sales_order_id && (
+              <Button
+                variant="outline"
+                onClick={() => router.push(`/sales/orders/${invoice.sales_order_id}`)}
+              >
+                View Sales Order
+              </Button>
+            )}
+
+          {invoice.agent_sale_id && (
+            <Button
+              variant="outline"
+              onClick={() => router.push(`/agent-sales/${invoice.agent_sale_id}`)}
+            >
+              View Agent Sale
             </Button>
+          )}
           </div>
         </div>
       </RequirePermission>

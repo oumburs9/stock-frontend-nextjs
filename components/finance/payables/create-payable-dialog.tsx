@@ -2,10 +2,14 @@
 
 import { useEffect, useState } from "react"
 import { useForm } from "react-hook-form"
+import type { AxiosError } from "axios"
 import { useCreatePayable } from "@/lib/hooks/use-finance"
 import { usePartners } from "@/lib/hooks/use-partners"
 import { usePurchaseOrders } from "@/lib/hooks/use-purchase-orders"
 import { useShipments } from "@/lib/hooks/use-shipments"
+import { parseApiError } from "@/lib/api/parse-api-error"
+import { showApiErrorToast } from "@/lib/api/show-api-error-toast"
+import { useToast } from "@/hooks/use-toast"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
@@ -28,6 +32,7 @@ export function CreatePayableDialog({ open, onOpenChange }: CreatePayableDialogP
   const { data: purchaseOrders } = usePurchaseOrders()
   const { data: shipments } = useShipments()
   const { hasPermission } = useAuth()
+  const toast = useToast()
 
   const {
     register,
@@ -35,6 +40,7 @@ export function CreatePayableDialog({ open, onOpenChange }: CreatePayableDialogP
     reset,
     watch,
     setValue,
+    setError,
     formState: { errors },
   } = useForm<CreatePayableRequest>({
     defaultValues: {
@@ -49,7 +55,11 @@ export function CreatePayableDialog({ open, onOpenChange }: CreatePayableDialogP
     },
   })
 
+  const [formError, setFormError] = useState<string | null>(null)
+
   useEffect(() => {
+    setFormError(null)
+
     if (open) {
       reset({
         supplierId: "",
@@ -65,15 +75,36 @@ export function CreatePayableDialog({ open, onOpenChange }: CreatePayableDialogP
     }
   }, [open, reset])
 
-  const onSubmit = async (data: CreatePayableRequest) => {
+  const onSubmit = (data: CreatePayableRequest) => {
     if (!hasPermission("payable:create")) return
+
+    setFormError(null)
+
     const payload: CreatePayableRequest = {
       ...data,
       purchaseShipmentId: sourceType === "shipment" ? data.purchaseShipmentId : null,
       purchaseOrderId: sourceType === "po" ? data.purchaseOrderId : null,
     }
-    await createMutation.mutateAsync(payload)
-    onOpenChange(false)
+
+    createMutation
+      .mutateAsync(payload)
+      .then(() => {
+        toast.success("Payable created")
+        onOpenChange(false)
+      })
+      .catch((e: AxiosError) => {
+        const parsed = parseApiError(e)
+
+        if (parsed.type === "validation") {
+          Object.entries(parsed.fieldErrors).forEach(([field, message]) => {
+            setError(field as keyof CreatePayableRequest, { message })
+          })
+          if (parsed.formError) setFormError(parsed.formError)
+          return
+        }
+
+        showApiErrorToast(parsed, toast)
+      })
   }
 
   const supplierOptions =
@@ -100,6 +131,13 @@ export function CreatePayableDialog({ open, onOpenChange }: CreatePayableDialogP
         <DialogHeader>
           <DialogTitle>Create Payable</DialogTitle>
         </DialogHeader>
+
+        {formError && (
+          <div className="rounded-md border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">
+            {formError}
+          </div>
+        )}
+
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="space-y-2">
             <Label>Supplier *</Label>
@@ -111,7 +149,9 @@ export function CreatePayableDialog({ open, onOpenChange }: CreatePayableDialogP
               searchPlaceholder="Search suppliers..."
               emptyMessage="No suppliers found."
             />
-            {errors.supplierId && <p className="text-sm text-destructive">{errors.supplierId.message}</p>}
+            {errors.supplierId?.message && (
+              <p className="text-sm text-destructive">{errors.supplierId.message}</p>
+            )}
           </div>
 
           <div className="space-y-3">
@@ -157,48 +197,30 @@ export function CreatePayableDialog({ open, onOpenChange }: CreatePayableDialogP
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="payableDate">Payable Date *</Label>
-              <Input
-                id="payableDate"
-                type="date"
-                {...register("payableDate", { required: "Payable date is required" })}
-              />
-              {errors.payableDate && <p className="text-sm text-destructive">{errors.payableDate.message}</p>}
+              <Input id="payableDate" type="date" {...register("payableDate")} />
+              {errors.payableDate?.message && (
+                <p className="text-sm text-destructive">{errors.payableDate.message}</p>
+              )}
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="dueDays">Due Days *</Label>
-              <Input
-                id="dueDays"
-                type="number"
-                {...register("dueDays", {
-                  required: "Due days is required",
-                  valueAsNumber: true,
-                  min: { value: 0, message: "Must be 0 or more" },
-                })}
-              />
-              {errors.dueDays && <p className="text-sm text-destructive">{errors.dueDays.message}</p>}
+              <Input id="dueDays" type="number" {...register("dueDays", { valueAsNumber: true })} />
+              {errors.dueDays?.message && <p className="text-sm text-destructive">{errors.dueDays.message}</p>}
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="currency">Currency *</Label>
-              <Input id="currency" {...register("currency", { required: "Currency is required" })} />
-              {errors.currency && <p className="text-sm text-destructive">{errors.currency.message}</p>}
+              <Input id="currency" {...register("currency")} />
+              {errors.currency?.message && <p className="text-sm text-destructive">{errors.currency.message}</p>}
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="amount">Amount *</Label>
-              <Input
-                id="amount"
-                type="number"
-                step="0.01"
-                {...register("amount", {
-                  required: "Amount is required",
-                  min: { value: 0.01, message: "Amount must be positive" },
-                })}
-              />
-              {errors.amount && <p className="text-sm text-destructive">{errors.amount.message}</p>}
+              <Input id="amount" type="number" step="0.01" {...register("amount")} />
+              {errors.amount?.message && <p className="text-sm text-destructive">{errors.amount.message}</p>}
             </div>
           </div>
 

@@ -1,7 +1,7 @@
 "use client"
+
 import { useForm, useFieldArray } from "react-hook-form"
-import { zodResolver } from "@hookform/resolvers/zod"
-import * as z from "zod"
+import type { AxiosError } from "axios"
 import {
   Dialog,
   DialogContent,
@@ -22,19 +22,17 @@ import { MoreHorizontal, Plus, Trash2 } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import type { AgentSale } from "@/lib/types/agent-sales"
 import { useAuth } from "@/lib/hooks/use-auth"
+import { parseApiError } from "@/lib/api/parse-api-error"
+import { showApiErrorToast } from "@/lib/api/show-api-error-toast"
 
-const itemSchema = z.object({
-  productId: z.string().min(1, "Product is required"),
-  quantity: z.string().min(1, "Quantity is required"),
-  grossUnitPrice: z.string().min(1, "Unit price is required"),
-})
-
-const formSchema = z.object({
-  items: z.array(itemSchema).min(1, "At least one item is required"),
-  notes: z.string().optional(),
-})
-
-type FormData = z.infer<typeof formSchema>
+interface FormData {
+  items: {
+    productId: string
+    quantity: string
+    grossUnitPrice: string
+  }[]
+  notes?: string
+}
 
 interface EditAgentSaleItemsDialogProps {
   open: boolean
@@ -43,7 +41,7 @@ interface EditAgentSaleItemsDialogProps {
 }
 
 export function EditAgentSaleItemsDialog({ open, onOpenChange, agentSale }: EditAgentSaleItemsDialogProps) {
-  const { toast } = useToast()
+  const toast = useToast()
   const { data: products = [] } = useProducts()
   const updateMutation = useUpdateAgentSale()
   const { hasPermission } = useAuth()
@@ -55,14 +53,17 @@ export function EditAgentSaleItemsDialog({ open, onOpenChange, agentSale }: Edit
     control,
     watch,
     setValue,
+    setError,
+    clearErrors,
+    reset,
   } = useForm<FormData>({
-    resolver: zodResolver(formSchema),
     defaultValues: {
-      items: agentSale.items?.map((item) => ({
-        productId: item.product_id,
-        quantity: item.quantity,
-        grossUnitPrice: item.gross_unit_price,
-      })) || [{ productId: "", quantity: "", grossUnitPrice: "" }],
+      items:
+        agentSale.items?.map((item) => ({
+          productId: item.product_id,
+          quantity: item.quantity,
+          grossUnitPrice: item.gross_unit_price,
+        })) || [{ productId: "", quantity: "", grossUnitPrice: "" }],
       notes: agentSale.notes || "",
     },
   })
@@ -91,33 +92,52 @@ export function EditAgentSaleItemsDialog({ open, onOpenChange, agentSale }: Edit
     return (qty * price).toFixed(2)
   }
 
+  const handleOpenChange = (nextOpen: boolean) => {
+    onOpenChange(nextOpen)
+    if (!nextOpen) {
+      reset({
+        items: [{ productId: "", quantity: "", grossUnitPrice: "" }],
+        notes: "",
+      })
+      clearErrors()
+    }
+  }
+
   const onSubmit = async (data: FormData) => {
     if (!hasPermission("agent-sale:update")) return
-    try {
-      await updateMutation.mutateAsync({
+
+    updateMutation.mutate(
+      {
         id: agentSale.id,
         data: {
           items: data.items,
           notes: data.notes || null,
         },
-      })
-      toast({
-        title: "Items updated",
-        description: "Agent sale items have been updated successfully.",
-      })
-      onOpenChange(false)
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.response?.data?.message || "Failed to update items",
-        variant: "destructive",
-      })
-    }
+      },
+      {
+        onSuccess: () => {
+          toast.success("Items updated", "Agent sale items have been updated successfully.")
+          handleOpenChange(false)
+        },
+        onError: (e: AxiosError) => {
+          const parsed = parseApiError(e)
+
+          if (parsed.type === "validation") {
+            Object.entries(parsed.fieldErrors).forEach(([field, message]) => {
+              setError(field as any, { message })
+            })
+            return
+          }
+
+          showApiErrorToast(parsed, toast, "Failed to update items.")
+        },
+      },
+    )
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogContent className="sm:max-w-[900px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Edit Sale Items</DialogTitle>
           <DialogDescription>Update the items for this agent sale</DialogDescription>
@@ -161,21 +181,32 @@ export function EditAgentSaleItemsDialog({ open, onOpenChange, agentSale }: Edit
                             value={item?.productId || ""}
                             onChange={(value) => {
                               setValue(`items.${index}.productId`, value)
-                              // Auto-fill price from product
+                              clearErrors(`items.${index}.productId`)
                               const price = getProductPrice(value)
                               setValue(`items.${index}.grossUnitPrice`, price)
                             }}
                             options={productOptions}
                             placeholder="Select product..."
                           />
-                          {errors.items?.[index]?.productId && (
-                            <p className="text-xs text-destructive mt-1">{errors.items[index]?.productId?.message}</p>
+                          {errors.items?.[index]?.productId?.message && (
+                            <p className="text-sm text-destructive">
+                              {errors.items[index]?.productId?.message}
+                            </p>
                           )}
                         </TableCell>
                         <TableCell>
-                          <Input type="number" step="0.01" placeholder="Qty" {...register(`items.${index}.quantity`)} />
-                          {errors.items?.[index]?.quantity && (
-                            <p className="text-xs text-destructive mt-1">{errors.items[index]?.quantity?.message}</p>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            placeholder="Qty"
+                            {...register(`items.${index}.quantity`, {
+                              onChange: () => clearErrors(`items.${index}.quantity`),
+                            })}
+                          />
+                          {errors.items?.[index]?.quantity?.message && (
+                            <p className="text-sm text-destructive">
+                              {errors.items[index]?.quantity?.message}
+                            </p>
                           )}
                         </TableCell>
                         <TableCell>
@@ -183,10 +214,12 @@ export function EditAgentSaleItemsDialog({ open, onOpenChange, agentSale }: Edit
                             type="number"
                             step="0.01"
                             placeholder="Price"
-                            {...register(`items.${index}.grossUnitPrice`)}
+                            {...register(`items.${index}.grossUnitPrice`, {
+                              onChange: () => clearErrors(`items.${index}.grossUnitPrice`),
+                            })}
                           />
-                          {errors.items?.[index]?.grossUnitPrice && (
-                            <p className="text-xs text-destructive mt-1">
+                          {errors.items?.[index]?.grossUnitPrice?.message && (
+                            <p className="text-sm text-destructive">
                               {errors.items[index]?.grossUnitPrice?.message}
                             </p>
                           )}
@@ -223,11 +256,17 @@ export function EditAgentSaleItemsDialog({ open, onOpenChange, agentSale }: Edit
 
           <div className="space-y-2">
             <Label htmlFor="notes">Notes (Optional)</Label>
-            <Input id="notes" {...register("notes")} placeholder="Add any notes..." />
+            <Input
+              id="notes"
+              {...register("notes", {
+                onChange: () => clearErrors("notes"),
+              })}
+              placeholder="Add any notes..."
+            />
           </div>
 
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            <Button type="button" variant="outline" onClick={() => handleOpenChange(false)}>
               Cancel
             </Button>
             <Button type="submit" disabled={updateMutation.isPending}>

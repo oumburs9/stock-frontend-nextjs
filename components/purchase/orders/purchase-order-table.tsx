@@ -1,9 +1,27 @@
 "use client"
 
 import { useState } from "react"
-import { MoreHorizontal, Plus, Search, X, CheckCircle, XCircle, PackageCheck, Eye, ChevronLeft, ChevronRight } from "lucide-react"
-import { usePurchaseOrders, useApprovePurchaseOrder, useCancelPurchaseOrder } from "@/lib/hooks/use-purchase-orders"
+import {
+  MoreHorizontal,
+  Plus,
+  Search,
+  X,
+  CheckCircle,
+  XCircle,
+  PackageCheck,
+  Eye,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react"
+import type { AxiosError } from "axios"
+
+import {
+  usePurchaseOrders,
+  useApprovePurchaseOrder,
+  useCancelPurchaseOrder,
+} from "@/lib/hooks/use-purchase-orders"
 import { usePartners } from "@/lib/hooks/use-partners"
+
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -16,9 +34,14 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Badge } from "@/components/ui/badge"
+
 import { PurchaseOrderFormDialog } from "./purchase-order-form-dialog"
 import { PurchaseOrderReceiveDialog } from "./purchase-order-receive-dialog"
+
 import { useToast } from "@/hooks/use-toast"
+import { parseApiError } from "@/lib/api/parse-api-error"
+import { showApiErrorToast } from "@/lib/api/show-api-error-toast"
+
 import { useRouter } from "next/navigation"
 import type { PurchaseOrder } from "@/lib/types/purchase"
 import { useAuth } from "@/lib/hooks/use-auth"
@@ -30,15 +53,19 @@ export function PurchaseOrderTable() {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [poToReceive, setPoToReceive] = useState<PurchaseOrder | null>(null)
   const [page, setPage] = useState(1)
-  const { toast } = useToast()
+
+  const toast = useToast()
   const router = useRouter()
 
   const { hasPermission } = useAuth()
+
   const { data: purchaseOrders, isLoading } = usePurchaseOrders({
     q: search || undefined,
     status: statusFilter || undefined,
   })
+
   const { data: suppliers } = usePartners("supplier")
+
   const approveMutation = useApprovePurchaseOrder()
   const cancelMutation = useCancelPurchaseOrder()
 
@@ -49,58 +76,42 @@ export function PurchaseOrderTable() {
 
   const handleEdit = (po: PurchaseOrder) => {
     if (po.status !== "draft") {
-      toast({
-        title: "Cannot Edit",
-        description: "Only draft purchase orders can be edited",
-        variant: "destructive",
-      })
+      toast.error("Only draft purchase orders can be edited")
       return
     }
+
     setSelectedPO(po)
     setIsDialogOpen(true)
   }
 
-  const handleApprove = async (po: PurchaseOrder) => {
-    try {
-      await approveMutation.mutateAsync(po.id)
-      toast({
-        title: "Success",
-        description: "Purchase order approved successfully",
+  const handleApprove = (po: PurchaseOrder) => {
+    approveMutation
+      .mutateAsync(po.id)
+      .then(() => {
+        toast.success("Purchase order approved")
       })
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.response?.data?.message || "Failed to approve purchase order",
-        variant: "destructive",
+      .catch((e: AxiosError) => {
+        showApiErrorToast(parseApiError(e), toast, "Failed to approve purchase order.")
       })
-    }
   }
 
-  const handleCancel = async (po: PurchaseOrder) => {
-    try {
-      await cancelMutation.mutateAsync(po.id)
-      toast({
-        title: "Success",
-        description: "Purchase order cancelled successfully",
+  const handleCancel = (po: PurchaseOrder) => {
+    cancelMutation
+      .mutateAsync(po.id)
+      .then(() => {
+        toast.success("Purchase order cancelled")
       })
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.response?.data?.message || "Failed to cancel purchase order",
-        variant: "destructive",
+      .catch((e: AxiosError) => {
+        showApiErrorToast(parseApiError(e), toast, "Failed to cancel purchase order.")
       })
-    }
   }
 
   const handleReceive = (po: PurchaseOrder) => {
     if (po.status !== "approved") {
-      toast({
-        title: "Cannot Receive",
-        description: "Only approved purchase orders can be received",
-        variant: "destructive",
-      })
+      toast.error("Only approved purchase orders can be received")
       return
     }
+
     setPoToReceive(po)
   }
 
@@ -111,16 +122,14 @@ export function PurchaseOrderTable() {
       cancelled: "destructive",
       received: "outline",
     }
+
     return <Badge variant={variants[status] || "secondary"}>{status}</Badge>
   }
-
-  const hasFilters = statusFilter
 
   const itemsPerPage = 10
   const startIndex = (page - 1) * itemsPerPage
   const paginatedOrder = purchaseOrders?.slice(startIndex, startIndex + itemsPerPage)
   const totalPages = Math.ceil((purchaseOrders?.length || 0) / itemsPerPage)
-  console.log("paginated: ", paginatedOrder)
 
   return (
     <div className="space-y-4">
@@ -134,13 +143,14 @@ export function PurchaseOrderTable() {
             className="pl-9"
           />
         </div>
+
         <Button
           onClick={() => {
             setSelectedPO(null)
             setIsDialogOpen(true)
           }}
           disabled={!hasPermission("purchase-order:create")}
-           title={
+          title={
             hasPermission("purchase-order:create")
               ? "Create purchase order"
               : "You do not have permission to create purchase orders"
@@ -155,6 +165,7 @@ export function PurchaseOrderTable() {
         <div className="flex items-center gap-2">
           <span className="text-sm text-muted-foreground">Filters:</span>
         </div>
+
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
@@ -166,14 +177,9 @@ export function PurchaseOrderTable() {
           <option value="received">Received</option>
           <option value="cancelled">Cancelled</option>
         </select>
-        {hasFilters && (
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => {
-              setStatusFilter("")
-            }}
-          >
+
+        {statusFilter && (
+          <Button size="sm" variant="ghost" onClick={() => setStatusFilter("")}>
             <X className="h-4 w-4 mr-1" />
             Clear Filters
           </Button>
@@ -214,7 +220,9 @@ export function PurchaseOrderTable() {
                   <TableCell>{getSupplierName(po.supplier_id)}</TableCell>
                   <TableCell>{getStatusBadge(po.status)}</TableCell>
                   <TableCell>{new Date(po.order_date).toLocaleDateString()}</TableCell>
-                  <TableCell>{po.expected_date ? new Date(po.expected_date).toLocaleDateString() : "-"}</TableCell>
+                  <TableCell>
+                    {po.expected_date ? new Date(po.expected_date).toLocaleDateString() : "-"}
+                  </TableCell>
                   <TableCell className="font-mono">{po.currency}</TableCell>
                   <TableCell className="text-right">{po.items.length}</TableCell>
                   <TableCell>
@@ -227,36 +235,50 @@ export function PurchaseOrderTable() {
                       <DropdownMenuContent align="end">
                         <DropdownMenuLabel>Actions</DropdownMenuLabel>
                         <DropdownMenuSeparator />
+
                         <DropdownMenuItem onClick={() => router.push(`/purchase/orders/${po.id}`)}>
                           <Eye className="h-4 w-4 mr-2" />
                           View Details
                         </DropdownMenuItem>
+
                         {po.status === "draft" && (
                           <>
-                            {hasPermission("purchase-order:update") && (<DropdownMenuItem onClick={() => handleEdit(po)}>Edit</DropdownMenuItem>)}
-                            {hasPermission("purchase-order:approve") && (<DropdownMenuItem onClick={() => handleApprove(po)}>
-                              <CheckCircle className="h-4 w-4 mr-2" />
-                              Approve
-                            </DropdownMenuItem>)}
+                            {hasPermission("purchase-order:update") && (
+                              <DropdownMenuItem onClick={() => handleEdit(po)}>
+                                Edit
+                              </DropdownMenuItem>
+                            )}
+                            {hasPermission("purchase-order:approve") && (
+                              <DropdownMenuItem onClick={() => handleApprove(po)}>
+                                <CheckCircle className="h-4 w-4 mr-2" />
+                                Approve
+                              </DropdownMenuItem>
+                            )}
                           </>
                         )}
-                        {po.status === "approved" && hasPermission("purchase-order:receive") &&
+
+                        {po.status === "approved" &&
+                          hasPermission("purchase-order:receive") &&
                           hasPermission("purchase-order:cancel") && (
-                          <DropdownMenuItem onClick={() => handleReceive(po)}>
-                            <PackageCheck className="h-4 w-4 mr-2" />
-                            Receive
-                          </DropdownMenuItem>
-                        )}
+                            <DropdownMenuItem onClick={() => handleReceive(po)}>
+                              <PackageCheck className="h-4 w-4 mr-2" />
+                              Receive
+                            </DropdownMenuItem>
+                          )}
+
                         {(po.status === "draft" || po.status === "approved") &&
                           hasPermission("purchase-order:cancel") && (
-                          <>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem onClick={() => handleCancel(po)} className="text-destructive">
-                              <XCircle className="h-4 w-4 mr-2" />
-                              Cancel
-                            </DropdownMenuItem>
-                          </>
-                        )}
+                            <>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                onClick={() => handleCancel(po)}
+                                className="text-destructive"
+                              >
+                                <XCircle className="h-4 w-4 mr-2" />
+                                Cancel
+                              </DropdownMenuItem>
+                            </>
+                          )}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>
@@ -266,42 +288,57 @@ export function PurchaseOrderTable() {
           </TableBody>
         </Table>
       </div>
-      { purchaseOrders && purchaseOrders.length > itemsPerPage && (
-          <div className="flex items-center justify-between">
-            <p className="text-sm text-muted-foreground">
-              Showing {startIndex + 1} to {Math.min(startIndex + itemsPerPage, purchaseOrders.length)} of{" "}
-              {purchaseOrders.length} transfers
-            </p>
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={() => setPage(Math.max(1, page - 1))} disabled={page === 1}>
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <div className="flex items-center gap-1">
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
-                  <Button
-                    key={p}
-                    variant={page === p ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setPage(p)}
-                    className="w-8 h-8 p-0"
-                  >
-                    {p}
-                  </Button>
-                ))}
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setPage(Math.min(totalPages, page + 1))}
-                disabled={page === totalPages}
-              >
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-        )}
 
-      <PurchaseOrderFormDialog purchaseOrder={selectedPO} open={isDialogOpen} onOpenChange={setIsDialogOpen} />
+      {purchaseOrders && purchaseOrders.length > itemsPerPage && (
+        <div className="flex items-center justify-between">
+          <p className="text-sm text-muted-foreground">
+            Showing {startIndex + 1} to{" "}
+            {Math.min(startIndex + itemsPerPage, purchaseOrders.length)} of{" "}
+            {purchaseOrders.length} transfers
+          </p>
+
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage(Math.max(1, page - 1))}
+              disabled={page === 1}
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+
+            <div className="flex items-center gap-1">
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+                <Button
+                  key={p}
+                  variant={page === p ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setPage(p)}
+                  className="w-8 h-8 p-0"
+                >
+                  {p}
+                </Button>
+              ))}
+            </div>
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage(Math.min(totalPages, page + 1))}
+              disabled={page === totalPages}
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      )}
+
+      <PurchaseOrderFormDialog
+        purchaseOrder={selectedPO}
+        open={isDialogOpen}
+        onOpenChange={setIsDialogOpen}
+      />
+
       {poToReceive && (
         <PurchaseOrderReceiveDialog
           purchaseOrder={poToReceive}

@@ -1,8 +1,12 @@
 "use client"
 
 import { useState } from "react"
+import type { AxiosError } from "axios"
 import { MoreHorizontal, Plus, Search, Eye, ChevronLeft, ChevronRight } from "lucide-react"
 import { usePartners, useDeletePartner } from "@/lib/hooks/use-partners"
+import { parseApiError } from "@/lib/api/parse-api-error"
+import { showApiErrorToast } from "@/lib/api/show-api-error-toast"
+import { useToast } from "@/hooks/use-toast"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -29,6 +33,8 @@ export function PartnerTable() {
   const router = useRouter()
 
   const { hasPermission } = useAuth()
+  const { success, error: errorToast, warning } = useToast()
+
   const { data: partners, isLoading } = usePartners()
   const deleteMutation = useDeletePartner()
 
@@ -49,9 +55,18 @@ export function PartnerTable() {
   }
 
   const confirmDelete = () => {
-    if (partnerToDelete) {
-      deleteMutation.mutate(partnerToDelete.id)
-    }
+    if (!partnerToDelete) return
+
+    deleteMutation.mutate(partnerToDelete.id, {
+      onSuccess: () => {
+        success("Partner deleted", "The partner was deleted successfully.")
+        setPartnerToDelete(null)
+      },
+      onError: (e: AxiosError) => {
+        const parsed = parseApiError(e)
+        showApiErrorToast(parsed, { error: errorToast, warning }, "Failed to delete partner.")
+      },
+    })
   }
 
   const handleViewDetails = (id: string) => {
@@ -87,7 +102,8 @@ export function PartnerTable() {
           >
             <Plus className="h-4 w-4 mr-2" />
             Add Partner
-          </Button>)}
+          </Button>
+        )}
       </div>
 
       <div className="rounded-md border">
@@ -148,11 +164,15 @@ export function PartnerTable() {
                           <Eye className="h-4 w-4 mr-2" />
                           View Details
                         </DropdownMenuItem>
-                        {hasPermission("partner:update") && (<DropdownMenuItem onClick={() => handleEdit(partner)}>Edit</DropdownMenuItem>)}
+                        {hasPermission("partner:update") && (
+                          <DropdownMenuItem onClick={() => handleEdit(partner)}>Edit</DropdownMenuItem>
+                        )}
                         <DropdownMenuSeparator />
-                        {hasPermission("partner:delete") && (<DropdownMenuItem onClick={() => handleDelete(partner)} className="text-destructive">
-                          Delete
-                        </DropdownMenuItem>)}
+                        {hasPermission("partner:delete") && (
+                          <DropdownMenuItem onClick={() => handleDelete(partner)} className="text-destructive">
+                            Delete
+                          </DropdownMenuItem>
+                        )}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>

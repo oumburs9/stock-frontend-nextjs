@@ -4,6 +4,8 @@ import { DashboardLayout } from "@/components/layout/dashboard-layout"
 import { ArrowLeft, CheckCircle, XCircle, PackageCheck, Search } from "lucide-react"
 import { useParams, useRouter } from "next/navigation"
 import { useState, useMemo } from "react"
+import type { AxiosError } from "axios"
+
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -20,80 +22,77 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+
 import { useToast } from "@/hooks/use-toast"
-import { usePurchaseOrder, useApprovePurchaseOrder, useCancelPurchaseOrder } from "@/lib/hooks/use-purchase-orders"
-import { useBatches } from "@/lib/hooks/use-batches"
+import { parseApiError } from "@/lib/api/parse-api-error"
+import { showApiErrorToast } from "@/lib/api/show-api-error-toast"
+
+import {
+  usePurchaseOrder,
+  useApprovePurchaseOrder,
+  useCancelPurchaseOrder,
+} from "@/lib/hooks/use-purchase-orders"
 import { usePartners } from "@/lib/hooks/use-partners"
 import { useProducts } from "@/lib/hooks/use-products"
 import { useAuth } from "@/lib/hooks/use-auth"
 
-
 export default function PurchaseOrderDetailPage() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
-  const { toast } = useToast()
+  const toast = useToast()
+
   const [showReceiveDialog, setShowReceiveDialog] = useState(false)
   const [showCancelConfirm, setShowCancelConfirm] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedItemForReceive, setSelectedItemForReceive] = useState<string | null>(null)
 
   const { data: poData, isLoading } = usePurchaseOrder(id)
-  console.log("poData: ", poData)
   const { data: suppliersData = [] } = usePartners("supplier")
   const { data: productsData = [] } = useProducts()
   const { hasPermission } = useAuth()
 
-
   const approveMutation = useApprovePurchaseOrder()
   const cancelMutation = useCancelPurchaseOrder()
-  
-  
+
+  const suppliers = suppliersData ?? []
+  const products = productsData ?? []
+
   const getProductName = (productId: string) => {
-    const product = productsData.find((p) => p.id === productId)
+    const product = products.find((p) => p.id === productId)
     return product?.name || "Unknown Product"
   }
-  
+
   const getProductSku = (productId: string) => {
-    const product = productsData.find((p) => p.id === productId)
+    const product = products.find((p) => p.id === productId)
     return product?.sku || "-"
   }
-  
+
   const getSupplierName = (supplierId: string) => {
     const supplier = suppliers.find((s) => s.id === supplierId)
     return supplier?.name || "Unknown Supplier"
   }
 
-  const handleApprove = async () => {
-    try {
-      await approveMutation.mutateAsync(po.id)
-      toast({
-        title: "Success",
-        description: "Purchase order approved successfully",
+  const handleApprove = () => {
+    approveMutation
+      .mutateAsync(id)
+      .then(() => {
+        toast.success("Purchase order approved")
       })
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to approve purchase order",
-        variant: "destructive",
+      .catch((e: AxiosError) => {
+        showApiErrorToast(parseApiError(e), toast, "Failed to approve purchase order.")
       })
-    }
   }
 
-  const handleCancel = async () => {
-    try {
-      await cancelMutation.mutateAsync(po.id)
-      toast({
-        title: "Success",
-        description: "Purchase order cancelled successfully",
+  const handleCancel = () => {
+    cancelMutation
+      .mutateAsync(id)
+      .then(() => {
+        toast.success("Purchase order cancelled")
+        setShowCancelConfirm(false)
       })
-      setShowCancelConfirm(false)
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to cancel purchase order",
-        variant: "destructive",
+      .catch((e: AxiosError) => {
+        showApiErrorToast(parseApiError(e), toast, "Failed to cancel purchase order.")
       })
-    }
   }
 
   const getStatusBadge = (status: string) => {
@@ -105,6 +104,7 @@ export default function PurchaseOrderDetailPage() {
     }
     return <Badge variant={variants[status] || "secondary"}>{status.toUpperCase()}</Badge>
   }
+
   const filteredItems = useMemo(() => {
     if (!poData?.items || poData.items.length === 0) return []
 
@@ -112,34 +112,25 @@ export default function PurchaseOrderDetailPage() {
 
     const query = searchQuery.toLowerCase()
     return poData.items.filter((item) => {
-      const productName = getProductName(item.product_id).toLowerCase() ?? ""
-      const sku = getProductSku(item.product_id).toLowerCase() ?? ""
+      const productName = getProductName(item.product_id).toLowerCase()
+      const sku = getProductSku(item.product_id).toLowerCase()
       return productName.includes(query) || sku.includes(query)
     })
-  }, [poData?.items, searchQuery, productsData])
-
+  }, [poData?.items, searchQuery, products])
 
   if (isLoading || !poData) {
     return (
       <DashboardLayout>
-        <div className="p-6 text-muted-foreground">
-          Loading purchase order…
-        </div>
+        <div className="p-6 text-muted-foreground">Loading purchase order…</div>
       </DashboardLayout>
     )
   }
 
   const po = poData
-  const suppliers = suppliersData ?? []
-  const products = productsData ?? []
- 
-
 
   const canReceive = po.status === "approved"
   const canApprove = po.status === "draft"
   const canCancel = po.status === "draft" || po.status === "approved"
-
-
 
   const handleReceiveItem = (itemId: string) => {
     setSelectedItemForReceive(itemId)
@@ -156,7 +147,6 @@ export default function PurchaseOrderDetailPage() {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <Button variant="ghost" size="sm" onClick={() => router.push("/purchase/orders")}>
@@ -195,7 +185,6 @@ export default function PurchaseOrderDetailPage() {
           </div>
         </div>
 
-        {/* Info Cards */}
         <div className="grid gap-4 md:grid-cols-2">
           <Card>
             <CardHeader>
@@ -244,7 +233,6 @@ export default function PurchaseOrderDetailPage() {
           </Card>
         </div>
 
-        {/* Items Table */}
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
@@ -281,14 +269,27 @@ export default function PurchaseOrderDetailPage() {
                       const received = Number.parseFloat(item.quantity_received || "0").toFixed(2)
                       const remaining = Number.parseFloat(item.quantity_remaining || "0").toFixed(2)
                       const hasRemaining = Number.parseFloat(item.quantity_remaining || "0") > 0
+
                       return (
                         <TableRow key={item.id}>
-                          <TableCell className="font-medium">{getProductName(item.product_id)}</TableCell>
-                          <TableCell className="font-mono text-sm">{getProductSku(item.product_id)}</TableCell>
-                          <TableCell className="text-right">{Number.parseFloat(item.quantity).toFixed(2)}</TableCell>
-                          <TableCell className="text-right text-green-600">{received}</TableCell>
-                          <TableCell className="text-right font-medium text-orange-600">{remaining}</TableCell>
-                          <TableCell className="text-right">{Number.parseFloat(item.unit_price).toFixed(2)}</TableCell>
+                          <TableCell className="font-medium">
+                            {getProductName(item.product_id)}
+                          </TableCell>
+                          <TableCell className="font-mono text-sm">
+                            {getProductSku(item.product_id)}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {Number.parseFloat(item.quantity).toFixed(2)}
+                          </TableCell>
+                          <TableCell className="text-right text-green-600">
+                            {received}
+                          </TableCell>
+                          <TableCell className="text-right font-medium text-orange-600">
+                            {remaining}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {Number.parseFloat(item.unit_price).toFixed(2)}
+                          </TableCell>
                           <TableCell className="text-right font-medium">
                             {Number.parseFloat(item.total_price).toFixed(2)}
                           </TableCell>
@@ -314,7 +315,12 @@ export default function PurchaseOrderDetailPage() {
                         Grand Total:
                       </TableCell>
                       <TableCell className="text-right font-semibold text-lg">
-                        {po.items.reduce((sum, item) => sum + Number.parseFloat(item.total_price), 0).toFixed(2)}{" "}
+                        {po.items
+                          .reduce(
+                            (sum, item) => sum + Number.parseFloat(item.total_price),
+                            0,
+                          )
+                          .toFixed(2)}{" "}
                         {po.currency}
                       </TableCell>
                       {canReceive && <TableCell />}
@@ -322,8 +328,13 @@ export default function PurchaseOrderDetailPage() {
                   </>
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={canReceive ? 8 : 7} className="text-center text-muted-foreground">
-                      {searchQuery ? "No items found matching your search" : "No items in this order"}
+                    <TableCell
+                      colSpan={canReceive ? 8 : 7}
+                      className="text-center text-muted-foreground"
+                    >
+                      {searchQuery
+                        ? "No items found matching your search"
+                        : "No items in this order"}
                     </TableCell>
                   </TableRow>
                 )}

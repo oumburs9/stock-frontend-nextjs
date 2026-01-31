@@ -1,10 +1,10 @@
 "use client"
 
 import { useState } from "react"
+import type { AxiosError } from "axios"
 import { MoreHorizontal, Eye, Calculator, ChevronLeft, ChevronRight } from "lucide-react"
 import { useRouter } from "next/navigation"
-import { useCostings, useComputeCosting } from "@/lib/hooks/use-finance"
-import { useInvoices } from "@/lib/hooks/use-finance"
+import { useCostings, useComputeCosting, useInvoices } from "@/lib/hooks/use-finance"
 import { Button } from "@/components/ui/button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import {
@@ -17,6 +17,9 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Card } from "@/components/ui/card"
 import { useAuth } from "@/lib/hooks/use-auth"
+import { parseApiError } from "@/lib/api/parse-api-error"
+import { showApiErrorToast } from "@/lib/api/show-api-error-toast"
+import { useToast } from "@/hooks/use-toast"
 
 interface CostingTableProps {
   searchQuery: string
@@ -26,6 +29,7 @@ export function CostingTable({ searchQuery }: CostingTableProps) {
   const [page, setPage] = useState(1)
   const router = useRouter()
   const { hasPermission } = useAuth()
+  const toast = useToast()
 
   const { data: costings, isLoading } = useCostings()
   const { data: invoices } = useInvoices()
@@ -46,9 +50,17 @@ export function CostingTable({ searchQuery }: CostingTableProps) {
     return invoice?.invoice_number || invoiceId.slice(0, 8) + "..."
   }
 
-  const handleRecompute = async (invoiceId: string) => {
+  const handleRecompute = (invoiceId: string) => {
     if (!hasPermission("costing:compute")) return
-    await computeMutation.mutateAsync(invoiceId)
+
+    computeMutation
+      .mutateAsync(invoiceId)
+      .then(() => {
+        toast.success("Costing recomputed")
+      })
+      .catch((e: AxiosError) => {
+        showApiErrorToast(parseApiError(e), toast, "Failed to recompute costing.")
+      })
   }
 
   return (
@@ -107,14 +119,18 @@ export function CostingTable({ searchQuery }: CostingTableProps) {
                         <DropdownMenuContent align="end">
                           <DropdownMenuLabel>Actions</DropdownMenuLabel>
                           <DropdownMenuSeparator />
-                          {hasPermission("invoice:view") && (<DropdownMenuItem onClick={() => router.push(`/finance/invoices/${costing.invoice_id}`)}>
-                            <Eye className="h-4 w-4 mr-2" />
-                            View Invoice
-                          </DropdownMenuItem>)}
-                          {hasPermission("costing:compute") && (<DropdownMenuItem onClick={() => handleRecompute(costing.invoice_id)}>
-                            <Calculator className="h-4 w-4 mr-2" />
-                            Recompute
-                          </DropdownMenuItem>)}
+                          {hasPermission("invoice:view") && (
+                            <DropdownMenuItem onClick={() => router.push(`/finance/invoices/${costing.invoice_id}`)}>
+                              <Eye className="h-4 w-4 mr-2" />
+                              View Invoice
+                            </DropdownMenuItem>
+                          )}
+                          {hasPermission("costing:compute") && (
+                            <DropdownMenuItem onClick={() => handleRecompute(costing.invoice_id)}>
+                              <Calculator className="h-4 w-4 mr-2" />
+                              Recompute
+                            </DropdownMenuItem>
+                          )}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>

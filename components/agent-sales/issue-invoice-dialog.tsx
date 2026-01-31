@@ -16,11 +16,14 @@ import { FileText } from "lucide-react"
 import { formatCurrency } from "@/lib/utils/currency"
 import { useRouter } from "next/navigation"
 import { useForm } from "react-hook-form"
+import type { AxiosError } from "axios"
 import { useTaxRules } from "@/lib/hooks/use-finance"
 import { SearchableCombobox } from "@/components/shared/searchable-combobox"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useAuth } from "@/lib/hooks/use-auth"
+import { parseApiError } from "@/lib/api/parse-api-error"
+import { showApiErrorToast } from "@/lib/api/show-api-error-toast"
 
 interface IssueInvoiceDialogProps {
   open: boolean
@@ -35,7 +38,7 @@ interface IssueInvoiceRequest {
 }
 
 export function IssueInvoiceDialog({ open, onOpenChange, agentSale }: IssueInvoiceDialogProps) {
-  const { toast } = useToast()
+  const toast = useToast()
   const router = useRouter()
   const issueInvoice = useIssueAgentSaleInvoice()
   const { data: taxRules = [] } = useTaxRules()
@@ -47,6 +50,8 @@ export function IssueInvoiceDialog({ open, onOpenChange, agentSale }: IssueInvoi
     reset,
     watch,
     setValue,
+    setError,
+    clearErrors,
     formState: { errors },
   } = useForm<IssueInvoiceRequest>({
     defaultValues: {
@@ -56,27 +61,42 @@ export function IssueInvoiceDialog({ open, onOpenChange, agentSale }: IssueInvoi
     },
   })
 
-  const handleIssue = async (data: IssueInvoiceRequest) => {
+  const handleOpenChange = (nextOpen: boolean) => {
+    onOpenChange(nextOpen)
+    if (!nextOpen) {
+      reset({
+        invoiceDate: new Date().toISOString().split("T")[0],
+        dueDays: 30,
+        taxRuleId: null,
+      })
+      clearErrors()
+    }
+  }
+
+  const handleIssue = (data: IssueInvoiceRequest) => {
     if (!hasPermission("agent-sale:issue-invoice")) return
+
     issueInvoice.mutate(
       { id: agentSale.id, data },
       {
         onSuccess: (result) => {
-          toast({
-            title: "Invoice issued",
-            description: "The invoice has been created successfully.",
-          })
-          onOpenChange(false)
+          toast.success("Invoice issued", "The invoice has been created successfully.")
+          handleOpenChange(false)
           if (result.invoice_id) {
             router.push(`/finance/invoices/${result.invoice_id}`)
           }
         },
-        onError: (error: any) => {
-          toast({
-            title: "Error",
-            description: error.response?.data?.message || "Failed to issue invoice",
-            variant: "destructive",
-          })
+        onError: (e: AxiosError) => {
+          const parsed = parseApiError(e)
+
+          if (parsed.type === "validation") {
+            Object.entries(parsed.fieldErrors).forEach(([field, message]) => {
+              setError(field as keyof IssueInvoiceRequest, { message })
+            })
+            return
+          }
+
+          showApiErrorToast(parsed, toast, "Failed to issue invoice.")
         },
       },
     )
@@ -92,7 +112,7 @@ export function IssueInvoiceDialog({ open, onOpenChange, agentSale }: IssueInvoi
   ]
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -121,7 +141,9 @@ export function IssueInvoiceDialog({ open, onOpenChange, agentSale }: IssueInvoi
             <Input
               id="invoiceDate"
               type="date"
-              {...register("invoiceDate", { required: "Invoice date is required" })}
+              {...register("invoiceDate", {
+                onChange: () => clearErrors("invoiceDate"),
+              })}
             />
             {errors.invoiceDate && <p className="text-sm text-destructive">{errors.invoiceDate.message}</p>}
           </div>
@@ -132,9 +154,8 @@ export function IssueInvoiceDialog({ open, onOpenChange, agentSale }: IssueInvoi
               id="dueDays"
               type="number"
               {...register("dueDays", {
-                required: "Due days is required",
                 valueAsNumber: true,
-                min: { value: 0, message: "Must be 0 or more" },
+                onChange: () => clearErrors("dueDays"),
               })}
             />
             {errors.dueDays && <p className="text-sm text-destructive">{errors.dueDays.message}</p>}
@@ -144,7 +165,10 @@ export function IssueInvoiceDialog({ open, onOpenChange, agentSale }: IssueInvoi
             <Label>Tax Rule</Label>
             <SearchableCombobox
               value={watch("taxRuleId") === null ? "null" : watch("taxRuleId") || ""}
-              onChange={(value) => setValue("taxRuleId", value === "null" ? null : value)}
+              onChange={(value) => {
+                setValue("taxRuleId", value === "null" ? null : value)
+                clearErrors("taxRuleId")
+              }}
               options={taxRuleOptions}
               placeholder="Select tax rule..."
               searchPlaceholder="Search tax rules..."
@@ -153,7 +177,7 @@ export function IssueInvoiceDialog({ open, onOpenChange, agentSale }: IssueInvoi
           </div>
 
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            <Button type="button" variant="outline" onClick={() => handleOpenChange(false)}>
               Cancel
             </Button>
             <Button type="submit" disabled={issueInvoice.isPending}>

@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Loader2, DollarSign } from "lucide-react"
 import { AddBatchExpenseDialog } from "./add-batch-expense-dialog"
 import { useAuth } from "@/lib/hooks/use-auth"
+import { formatCurrency } from "@/lib/utils/currency"
 
 interface BatchViewerProps {
   productId: string
@@ -77,10 +78,10 @@ export function BatchViewer({ productId }: BatchViewerProps) {
                     <TableCell className="text-right font-mono">{batch.quantity_received}</TableCell>
                     <TableCell className="text-right font-mono font-medium">{batch.quantity_remaining}</TableCell>
                     <TableCell className="text-right font-mono">
-                      ETB {Number.parseFloat(batch.base_unit_cost).toFixed(2)}
+                      {formatCurrency(Number(batch.base_unit_cost ?? 0), 'ETB')} 
                     </TableCell>
                     <TableCell className="text-right font-mono font-medium text-green-600 dark:text-green-400">
-                      ETB {Number.parseFloat(batch.landed_unit_cost).toFixed(2)}
+                      {formatCurrency(Number(batch.landed_unit_cost ?? 0), 'ETB')} 
                     </TableCell>
                     <TableCell>
                       {hasPermission("product-batch-expense:add") && (<Button size="sm" variant="outline" onClick={() => handleAddExpense(batch.id)}>

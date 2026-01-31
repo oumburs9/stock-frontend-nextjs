@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
-import { ArrowLeft, Package, DollarSign, Plus } from "lucide-react"
+import { ArrowLeft, Package, DollarSign, Plus, Bath } from "lucide-react"
 import { useParams, useRouter } from "next/navigation"
 import { AddBatchExpenseDialog } from "@/components/purchase/batches/add-batch-expense-dialog"
 import { DashboardLayout } from "@/components/layout/dashboard-layout"
@@ -16,6 +16,9 @@ import { ChevronDown } from "lucide-react"
 import { useProducts } from "@/lib/hooks/use-products"
 import { RequirePermission } from "@/components/auth/require-permission"
 import { useAuth } from "@/lib/hooks/use-auth"
+import { formatCurrency } from "@/lib/utils/currency"
+import { useShipment } from "@/lib/hooks/use-shipments"
+import { usePartners } from "@/lib/hooks/use-partners"
 
 export default function BatchDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -24,8 +27,9 @@ export default function BatchDetailPage() {
   const [selectedExpenseForAdjust, setSelectedExpenseForAdjust] = useState(null)
 
   const { hasPermission } = useAuth()
-  const { data: batch } = useGetBatch(id)
-   const { data: productsData = []} = useProducts()
+  const { data: batch } = useGetBatch(id) 
+  const { data: productsData = []} = useProducts()
+  const { data: suppliers = [] } = usePartners("supplier")
 
   const getProductName = (productId: string) => {
     const product = productsData.find((p) => p.id === productId)
@@ -33,6 +37,14 @@ export default function BatchDetailPage() {
   }
 
   const displayBatch = batch
+
+  const shipmentId = displayBatch?.shipment_id ?? null
+  const { data: shipmentData } = useShipment(shipmentId)
+
+  const getSupplierName = (supplierId: string) => {
+    const supplier = suppliers.find((s) => s.id === supplierId)
+    return supplier?.name || supplierId
+  }
 
   // const totalExpenses = displayBatch?.expenses?.reduce((sum, exp) => sum + Number.parseFloat(exp.amount || "0"), 0) || 0
   const totalExpenses = displayBatch?.expenses.reduce((sum, exp) => {
@@ -85,7 +97,7 @@ export default function BatchDetailPage() {
                 {/* <DollarSign className="h-4 w-4 text-muted-foreground" /> */}
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">ETB {Number.parseFloat(displayBatch?.base_unit_cost).toFixed(2)}</div>
+                <div className="text-2xl font-bold">{formatCurrency(Number(displayBatch?.base_unit_cost ?? 0))} ETB</div>
                 <p className="text-xs text-muted-foreground">per unit</p>
               </CardContent>
             </Card>
@@ -96,7 +108,7 @@ export default function BatchDetailPage() {
                 {/* <DollarSign className="h-4 w-4 text-muted-foreground" /> */}
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">ETB {Number.parseFloat(displayBatch?.landed_unit_cost).toFixed(2)}</div>
+                <div className="text-2xl font-bold">{formatCurrency(Number(displayBatch?.landed_unit_cost ?? 0))} ETB</div>
                 <p className="text-xs text-muted-foreground">includes expenses</p>
               </CardContent>
             </Card>
@@ -107,7 +119,7 @@ export default function BatchDetailPage() {
                 {/* <DollarSign className="h-4 w-4 text-muted-foreground" /> */}
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">ETB {totalExpenses.toFixed(2)}</div>
+                <div className="text-2xl font-bold">{formatCurrency(Number(totalExpenses))} ETB</div>
                 <p className="text-xs text-muted-foreground">{displayBatch?.expenses?.length || 0} expense(s)</p>
               </CardContent>
             </Card>
@@ -185,17 +197,17 @@ export default function BatchDetailPage() {
                               </div>
                               <div className="flex items-center gap-4 text-sm text-muted-foreground">
                                 <span>Date: {new Date(expense.expense_date).toLocaleDateString()}</span>
-                                <span>Original: ETB {Number.parseFloat(expense.amount).toFixed(2)}</span>
+                                <span>Original: {formatCurrency(Number(expense.amount ?? 0), 'ETB')}</span>
                                 {adjustmentsSum !== 0 && (
                                   <span
                                     className={
                                       adjustmentsSum > 0 ? "text-green-600 font-medium" : "text-red-600 font-medium"
                                     }
                                   >
-                                    Adjustments: {adjustmentsSum > 0 ? "+" : ""}ETB {adjustmentsSum.toFixed(2)}
+                                    Adjustments: {adjustmentsSum > 0 ? "+" : ""} {formatCurrency(Math.abs(adjustmentsSum), 'ETB')}
                                   </span>
                                 )}
-                                <span className="font-semibold text-foreground">Net: ETB {netAmount.toFixed(2)}</span>
+                                <span className="font-semibold text-foreground">{formatCurrency(Number(netAmount ?? 0), 'ETB')}</span>
                               </div>
                             </div>
                             {hasPermission("product-batch-expense:adjust") && (
@@ -263,6 +275,58 @@ export default function BatchDetailPage() {
                 )}
               </CardContent>
             </Card>
+            {shipmentId && shipmentData && (
+  <Card>
+    <CardHeader>
+      <CardTitle>Related Shipment</CardTitle>
+    </CardHeader>
+
+    <CardContent className="space-y-3">
+      <div className="flex justify-between">
+        <span className="text-sm text-muted-foreground">Shipment Code</span>
+        <span className="font-medium">{shipmentData.code}</span>
+      </div>
+
+      <Separator />
+
+      <div className="flex justify-between">
+        <span className="text-sm text-muted-foreground">Status</span>
+        <Badge variant="outline">
+          {shipmentData.status.replace("_", " ").toUpperCase()}
+        </Badge>
+      </div>
+
+      <div className="flex justify-between">
+        <span className="text-sm text-muted-foreground">Supplier</span>
+        <span className="text-sm">
+          {getSupplierName(shipmentData.supplier_id) ?? "—"}
+        </span>
+      </div>
+
+      <div className="flex justify-between">
+        <span className="text-sm text-muted-foreground">Arrival Date</span>
+        <span className="text-sm">
+          {shipmentData.arrival_date
+            ? new Date(shipmentData.arrival_date).toLocaleDateString()
+            : "—"}
+        </span>
+      </div>
+
+      <Separator />
+
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() =>
+          router.push(`/purchase/shipments/${shipmentId}`)
+        }
+      >
+        View Shipment Details
+      </Button>
+    </CardContent>
+  </Card>
+)}
+
           </div>
 
           <AddBatchExpenseDialog batchId={id} open={addExpenseOpen} onOpenChange={setAddExpenseOpen} />

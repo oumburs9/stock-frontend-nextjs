@@ -1,6 +1,7 @@
 "use client"
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import type { AxiosError } from "axios"
 import {
   invoiceService,
   receivableService,
@@ -16,8 +17,13 @@ import type {
   UpsertTaxConfigRequest,
   CreateTaxRuleRequest,
   UpdateTaxRuleRequest,
+  InvoiceWithItems,
+  Receivable,
+  Payable,
+  TaxConfig,
+  TaxRule,
+  Costing,
 } from "@/lib/types/finance"
-import { useToast } from "@/hooks/use-toast"
 
 // ===== INVOICE HOOKS =====
 
@@ -39,24 +45,12 @@ export function useInvoice(id: string | null) {
 
 export function useIssueInvoice() {
   const queryClient = useQueryClient()
-  const { toast } = useToast()
 
-  return useMutation({
-    mutationFn: (data: IssueInvoiceRequest) => invoiceService.issueInvoice(data),
+  return useMutation<InvoiceWithItems, AxiosError, IssueInvoiceRequest>({
+    mutationFn: (data) => invoiceService.issueInvoice(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["invoices"] })
       queryClient.invalidateQueries({ queryKey: ["receivables"] })
-      toast({
-        title: "Success",
-        description: "Invoice issued successfully",
-      })
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: error.response?.data?.message || "Failed to issue invoice",
-        variant: "destructive",
-      })
     },
   })
 }
@@ -89,24 +83,12 @@ export function useReceivablePayments(id: string | null) {
 
 export function useCreateReceivablePayment() {
   const queryClient = useQueryClient()
-  const { toast } = useToast()
 
-  return useMutation({
-    mutationFn: (data: CreateReceivablePaymentRequest) => receivableService.createReceivablePayment(data),
+  return useMutation<Receivable, AxiosError, CreateReceivablePaymentRequest>({
+    mutationFn: (data) => receivableService.createReceivablePayment(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["receivables"] })
       queryClient.invalidateQueries({ queryKey: ["receivable-payments"] })
-      toast({
-        title: "Success",
-        description: "Payment recorded successfully",
-      })
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: error.response?.data?.message || "Failed to record payment",
-        variant: "destructive",
-      })
     },
   })
 }
@@ -131,23 +113,11 @@ export function usePayable(id: string | null) {
 
 export function useCreatePayable() {
   const queryClient = useQueryClient()
-  const { toast } = useToast()
 
-  return useMutation({
-    mutationFn: (data: CreatePayableRequest) => payableService.createPayable(data),
+  return useMutation<Payable, AxiosError, CreatePayableRequest>({
+    mutationFn: (data) => payableService.createPayable(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["payables"] })
-      toast({
-        title: "Success",
-        description: "Payable created successfully",
-      })
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: error.response?.data?.message || "Failed to create payable",
-        variant: "destructive",
-      })
     },
   })
 }
@@ -162,24 +132,12 @@ export function usePayablePayments(id: string | null) {
 
 export function useCreatePayablePayment() {
   const queryClient = useQueryClient()
-  const { toast } = useToast()
 
-  return useMutation({
-    mutationFn: (data: CreatePayablePaymentRequest) => payableService.createPayablePayment(data),
+  return useMutation<Payable, AxiosError, CreatePayablePaymentRequest>({
+    mutationFn: (data) => payableService.createPayablePayment(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["payables"] })
       queryClient.invalidateQueries({ queryKey: ["payable-payments"] })
-      toast({
-        title: "Success",
-        description: "Payment recorded successfully",
-      })
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: error.response?.data?.message || "Failed to record payment",
-        variant: "destructive",
-      })
     },
   })
 }
@@ -196,23 +154,11 @@ export function useTaxConfig() {
 
 export function useUpsertTaxConfig() {
   const queryClient = useQueryClient()
-  const { toast } = useToast()
 
-  return useMutation({
-    mutationFn: (data: UpsertTaxConfigRequest) => taxService.upsertTaxConfig(data),
+  return useMutation<TaxConfig, AxiosError, UpsertTaxConfigRequest>({
+    mutationFn: (data) => taxService.upsertTaxConfig(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["tax-config"] })
-      toast({
-        title: "Success",
-        description: "Tax configuration updated successfully",
-      })
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: error.response?.data?.message || "Failed to update tax configuration",
-        variant: "destructive",
-      })
     },
   })
 }
@@ -235,69 +181,33 @@ export function useTaxRule(id: string | null) {
 
 export function useCreateTaxRule() {
   const queryClient = useQueryClient()
-  const { toast } = useToast()
 
-  return useMutation({
-    mutationFn: (data: CreateTaxRuleRequest) => taxService.createTaxRule(data),
+  return useMutation<TaxRule, AxiosError, CreateTaxRuleRequest>({
+    mutationFn: (data) => taxService.createTaxRule(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["tax-rules"] })
-      toast({
-        title: "Success",
-        description: "Tax rule created successfully",
-      })
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: error.response?.data?.message || "Failed to create tax rule",
-        variant: "destructive",
-      })
     },
   })
 }
 
 export function useUpdateTaxRule() {
   const queryClient = useQueryClient()
-  const { toast } = useToast()
 
-  return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: UpdateTaxRuleRequest }) => taxService.updateTaxRule(id, data),
+  return useMutation<TaxRule, AxiosError, { id: string; data: UpdateTaxRuleRequest }>({
+    mutationFn: ({ id, data }) => taxService.updateTaxRule(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["tax-rules"] })
-      toast({
-        title: "Success",
-        description: "Tax rule updated successfully",
-      })
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: error.response?.data?.message || "Failed to update tax rule",
-        variant: "destructive",
-      })
     },
   })
 }
 
 export function useDeleteTaxRule() {
   const queryClient = useQueryClient()
-  const { toast } = useToast()
 
-  return useMutation({
-    mutationFn: (id: string) => taxService.deleteTaxRule(id),
+  return useMutation<{ message: string }, AxiosError, string>({
+    mutationFn: (id) => taxService.deleteTaxRule(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["tax-rules"] })
-      toast({
-        title: "Success",
-        description: "Tax rule deleted successfully",
-      })
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: error.response?.data?.message || "Failed to delete tax rule",
-        variant: "destructive",
-      })
     },
   })
 }
@@ -322,23 +232,11 @@ export function useCostingByInvoice(invoiceId: string | null) {
 
 export function useComputeCosting() {
   const queryClient = useQueryClient()
-  const { toast } = useToast()
 
-  return useMutation({
-    mutationFn: (invoiceId: string) => costingService.computeCosting(invoiceId),
+  return useMutation<Costing, AxiosError, string>({
+    mutationFn: (invoiceId) => costingService.computeCosting(invoiceId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["costings"] })
-      toast({
-        title: "Success",
-        description: "Costing computed successfully",
-      })
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: error.response?.data?.message || "Failed to compute costing",
-        variant: "destructive",
-      })
     },
   })
 }

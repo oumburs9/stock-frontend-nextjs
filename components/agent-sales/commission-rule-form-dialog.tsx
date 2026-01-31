@@ -2,8 +2,6 @@
 
 import { useEffect } from "react"
 import { useForm } from "react-hook-form"
-import { zodResolver } from "@hookform/resolvers/zod"
-import * as z from "zod"
 import {
   Dialog,
   DialogContent,
@@ -20,19 +18,20 @@ import { Switch } from "@/components/ui/switch"
 import { useToast } from "@/hooks/use-toast"
 import { useCreateCommissionRule, useUpdateCommissionRule } from "@/lib/hooks/use-agent-sales"
 import type { CommissionRule } from "@/lib/types/agent-sales"
+import type { AxiosError } from "axios"
+import { parseApiError } from "@/lib/api/parse-api-error"
+import { showApiErrorToast } from "@/lib/api/show-api-error-toast"
 
-const formSchema = z.object({
-  name: z.string().min(1, "Name is required"),
-  commissionType: z.enum(["license_use", "principal_commission"]),
-  basisType: z.literal("percentage"),
-  value: z.string().min(1, "Value is required"),
-  currency: z.string().min(1, "Currency is required"),
-  isActive: z.boolean().default(true),
-  validFrom: z.string().optional().nullable(),
-  validTo: z.string().optional().nullable(),
-})
-
-type FormData = z.infer<typeof formSchema>
+type FormData = {
+  name: string
+  commissionType: "license_use" | "principal_commission"
+  basisType: "percentage"
+  value: string
+  currency: string
+  isActive: boolean
+  validFrom?: string | null
+  validTo?: string | null
+}
 
 interface CommissionRuleFormDialogProps {
   open: boolean
@@ -41,7 +40,7 @@ interface CommissionRuleFormDialogProps {
 }
 
 export function CommissionRuleFormDialog({ open, onOpenChange, rule }: CommissionRuleFormDialogProps) {
-  const { toast } = useToast()
+  const toast = useToast()
   const createMutation = useCreateCommissionRule()
   const updateMutation = useUpdateCommissionRule()
 
@@ -52,8 +51,9 @@ export function CommissionRuleFormDialog({ open, onOpenChange, rule }: Commissio
     reset,
     setValue,
     watch,
+    setError,
+    clearErrors,
   } = useForm<FormData>({
-    resolver: zodResolver(formSchema),
     defaultValues: {
       name: "",
       commissionType: "license_use",
@@ -69,6 +69,21 @@ export function CommissionRuleFormDialog({ open, onOpenChange, rule }: Commissio
   const isActive = watch("isActive")
 
   useEffect(() => {
+    if (!open) {
+      reset({
+        name: "",
+        commissionType: "license_use",
+        basisType: "percentage",
+        value: "10.00",
+        currency: "ETB",
+        isActive: true,
+        validFrom: null,
+        validTo: null,
+      })
+      clearErrors()
+      return
+    }
+
     if (rule) {
       reset({
         name: rule.name,
@@ -80,37 +95,31 @@ export function CommissionRuleFormDialog({ open, onOpenChange, rule }: Commissio
         validFrom: rule.valid_from ? rule.valid_from.split("T")[0] : null,
         validTo: rule.valid_to ? rule.valid_to.split("T")[0] : null,
       })
-    } else {
-      reset({
-        name: "",
-        commissionType: "license_use",
-        basisType: "percentage",
-        value: "10.00",
-        currency: "ETB",
-        isActive: true,
-        validFrom: null,
-        validTo: null,
-      })
     }
-  }, [rule, reset, open])
+  }, [rule, reset, open, clearErrors])
 
-  const onSubmit = async (data: FormData) => {
-    try {
-      if (rule) {
-        await updateMutation.mutateAsync({ id: rule.id, data })
-        toast({ title: "Rule updated", description: "Commission rule updated successfully" })
-      } else {
-        await createMutation.mutateAsync(data)
-        toast({ title: "Rule created", description: "Commission rule created successfully" })
-      }
-      onOpenChange(false)
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to save rule",
-        variant: "destructive",
+  const onSubmit = (data: FormData) => {
+    const action = rule
+      ? updateMutation.mutateAsync({ id: rule.id, data })
+      : createMutation.mutateAsync(data)
+
+    action
+      .then(() => {
+        toast.success(rule ? "Rule updated" : "Rule created")
+        onOpenChange(false)
       })
-    }
+      .catch((e: AxiosError) => {
+        const parsed = parseApiError(e)
+
+        if (parsed.type === "validation") {
+          Object.entries(parsed.fieldErrors).forEach(([field, message]) => {
+            setError(field as keyof FormData, { message })
+          })
+          return
+        }
+
+        showApiErrorToast(parsed, toast, "Failed to save rule")
+      })
   }
 
   return (
@@ -126,7 +135,15 @@ export function CommissionRuleFormDialog({ open, onOpenChange, rule }: Commissio
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 py-4">
           <div className="space-y-2">
             <Label htmlFor="name">Rule Name</Label>
-            <Input id="name" {...register("name")} placeholder="e.g., Standard License Commission" />
+            <Input
+              id="name"
+              {...register("name")}
+              placeholder="e.g., Standard License Commission"
+              onChange={(e) => {
+                setValue("name", e.target.value)
+                clearErrors("name")
+              }}
+            />
             {errors.name && <p className="text-sm text-destructive">{errors.name.message}</p>}
           </div>
 
@@ -135,7 +152,10 @@ export function CommissionRuleFormDialog({ open, onOpenChange, rule }: Commissio
               <Label>Commission Type</Label>
               <Select
                 value={watch("commissionType")}
-                onValueChange={(v) => setValue("commissionType", v as any)}
+                onValueChange={(v) => {
+                  setValue("commissionType", v as "license_use" | "principal_commission")
+                  clearErrors("commissionType")
+                }}
                 disabled={!!rule}
               >
                 <SelectTrigger>
@@ -149,7 +169,16 @@ export function CommissionRuleFormDialog({ open, onOpenChange, rule }: Commissio
             </div>
             <div className="space-y-2">
               <Label htmlFor="value">Value (%)</Label>
-              <Input id="value" type="number" step="0.01" {...register("value")} />
+              <Input
+                id="value"
+                type="number"
+                step="0.01"
+                {...register("value")}
+                onChange={(e) => {
+                  setValue("value", e.target.value)
+                  clearErrors("value")
+                }}
+              />
               {errors.value && <p className="text-sm text-destructive">{errors.value.message}</p>}
             </div>
           </div>
@@ -157,11 +186,25 @@ export function CommissionRuleFormDialog({ open, onOpenChange, rule }: Commissio
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="currency">Currency</Label>
-              <Input id="currency" {...register("currency")} />
+              <Input
+                id="currency"
+                {...register("currency")}
+                onChange={(e) => {
+                  setValue("currency", e.target.value)
+                  clearErrors("currency")
+                }}
+              />
               {errors.currency && <p className="text-sm text-destructive">{errors.currency.message}</p>}
             </div>
             <div className="flex items-center space-x-2 pt-8">
-              <Switch id="isActive" checked={isActive} onCheckedChange={(v) => setValue("isActive", v)} />
+              <Switch
+                id="isActive"
+                checked={isActive}
+                onCheckedChange={(v) => {
+                  setValue("isActive", v)
+                  clearErrors("isActive")
+                }}
+              />
               <Label htmlFor="isActive">Active Status</Label>
             </div>
           </div>
@@ -169,11 +212,27 @@ export function CommissionRuleFormDialog({ open, onOpenChange, rule }: Commissio
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="validFrom">Valid From</Label>
-              <Input id="validFrom" type="date" {...register("validFrom")} />
+              <Input
+                id="validFrom"
+                type="date"
+                {...register("validFrom")}
+                onChange={(e) => {
+                  setValue("validFrom", e.target.value)
+                  clearErrors("validFrom")
+                }}
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="validTo">Valid To</Label>
-              <Input id="validTo" type="date" {...register("validTo")} />
+              <Input
+                id="validTo"
+                type="date"
+                {...register("validTo")}
+                onChange={(e) => {
+                  setValue("validTo", e.target.value)
+                  clearErrors("validTo")
+                }}
+              />
             </div>
           </div>
 

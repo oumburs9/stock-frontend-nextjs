@@ -76,7 +76,7 @@ export function StockSnapshotTable() {
           className="h-9 px-3 text-sm border border-input rounded-md bg-background text-foreground hover:bg-accent focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
         >
           <option value="">All Warehouses</option>
-          {warehouses?.items?.map((w) => (
+          {warehouses?.map((w) => (
             <option key={w.id} value={w.id}>
               {w.name}
             </option>
@@ -91,7 +91,7 @@ export function StockSnapshotTable() {
           className="h-9 px-3 text-sm border border-input rounded-md bg-background text-foreground hover:bg-accent focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
         >
           <option value="">All Shops</option>
-          {shops?.items?.map((s) => (
+          {shops?.map((s) => (
             <option key={s.id} value={s.id}>
               {s.name}
             </option>

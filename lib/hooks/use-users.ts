@@ -1,18 +1,19 @@
 "use client"
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import type { AxiosError } from "axios"
 import { userService } from "@/lib/services/user.service"
-import type { CreateUserRequest, UpdateUserRequest } from "@/lib/types/user"
+import type { CreateUserRequest, UpdateUserRequest, User } from "@/lib/types/user"
 
 export function useUsers() {
-  return useQuery({
+  return useQuery<User[], AxiosError>({
     queryKey: ["users"],
     queryFn: () => userService.getUsers(),
   })
 }
 
 export function useUser(id: string | null) {
-  return useQuery({
+  return useQuery<User | null, AxiosError>({
     queryKey: ["users", id],
     queryFn: () => (id ? userService.getUser(id) : null),
     enabled: !!id,
@@ -22,8 +23,8 @@ export function useUser(id: string | null) {
 export function useCreateUser() {
   const queryClient = useQueryClient()
 
-  return useMutation({
-    mutationFn: (data: CreateUserRequest) => userService.createUser(data),
+  return useMutation<User, AxiosError, CreateUserRequest>({
+    mutationFn: (data) => userService.createUser(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["users"] })
     },
@@ -33,8 +34,8 @@ export function useCreateUser() {
 export function useUpdateUser() {
   const queryClient = useQueryClient()
 
-  return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: UpdateUserRequest }) => userService.updateUser(id, data),
+  return useMutation<void, AxiosError, { id: string; data: UpdateUserRequest }>({
+    mutationFn: ({ id, data }) => userService.updateUser(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["users"] })
     },
@@ -44,8 +45,8 @@ export function useUpdateUser() {
 export function useDeleteUser() {
   const queryClient = useQueryClient()
 
-  return useMutation({
-    mutationFn: (id: string) => userService.deleteUser(id),
+  return useMutation<void, AxiosError, string>({
+    mutationFn: (id) => userService.deleteUser(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["users"] })
     },
@@ -55,8 +56,8 @@ export function useDeleteUser() {
 export function useUpdateUserStatus() {
   const queryClient = useQueryClient()
 
-  return useMutation({
-    mutationFn: ({ id, isActive }: { id: string; isActive: boolean }) => userService.updateUserStatus(id, isActive),
+  return useMutation<void, AxiosError, { id: string; isActive: boolean }>({
+    mutationFn: ({ id, isActive }) => userService.updateUserStatus(id, isActive),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["users"] })
     },
@@ -66,8 +67,8 @@ export function useUpdateUserStatus() {
 export function useUpdateUserRoles() {
   const queryClient = useQueryClient()
 
-  return useMutation({
-    mutationFn: ({ id, roleIds }: { id: string; roleIds: string[] }) => userService.updateUserRoles(id, roleIds),
+  return useMutation<void, AxiosError, { id: string; roleIds: string[] }>({
+    mutationFn: ({ id, roleIds }) => userService.updateUserRoles(id, roleIds),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["users"] })
     },

@@ -11,6 +11,9 @@ import { AddExpenseDialog } from "./add-expense-dialog"
 import { ReceiveShipmentDialog } from "./receive-shipment-dialog"
 import { UpdateShipmentDialog } from "./update-shipment-dialog"
 import { useToast } from "@/hooks/use-toast"
+import type { AxiosError } from "axios"
+import { parseApiError } from "@/lib/api/parse-api-error"
+import { showApiErrorToast } from "@/lib/api/show-api-error-toast"
 
 interface ShipmentDetailProps {
   id: string
@@ -22,7 +25,7 @@ export function ShipmentDetail({ id }: ShipmentDetailProps) {
   const [isReceiveDialogOpen, setIsReceiveDialogOpen] = useState(false)
   const [isUpdateDialogOpen, setIsUpdateDialogOpen] = useState(false)
   const closeShipmentMutation = useCloseShipment()
-  const { toast } = useToast()
+  const toast = useToast()
 
   if (isLoading) {
     return (
@@ -57,16 +60,9 @@ export function ShipmentDetail({ id }: ShipmentDetailProps) {
   const handleClose = async () => {
     try {
       await closeShipmentMutation.mutateAsync(id)
-      toast({
-        title: "Success",
-        description: "Shipment closed successfully",
-      })
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.response?.data?.message || "Failed to close shipment",
-        variant: "destructive",
-      })
+      toast.success("Shipment closed", "Shipment closed successfully")
+    } catch (e) {
+      showApiErrorToast(parseApiError(e as AxiosError), toast, "Failed to close shipment")
     }
   }
 

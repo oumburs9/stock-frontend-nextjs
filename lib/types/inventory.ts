@@ -85,6 +85,7 @@ export type LocationType = "warehouse" | "shop"
 export interface StockTransfer {
   id: string
   product: {
+    sku: string
     id: string
     name: string
   }
@@ -120,6 +121,7 @@ export type AdjustmentDirection = "in" | "out"
 export interface StockAdjustment {
   id: string
   product: {
+    sku: string
     id: string
     name: string
   }
@@ -156,6 +158,7 @@ export type ReservationStatus = "active" | "released" | "consumed"
 export interface StockReservation {
   id: string
   product: {
+    sku: string
     id: string
     name: string
   }

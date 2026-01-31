@@ -2,7 +2,8 @@
 
 import { useEffect } from "react"
 import { useForm } from "react-hook-form"
-import { useIssueInvoice } from "@/lib/hooks/use-finance"
+import type { AxiosError } from "axios"
+import { useInvoices, useIssueInvoice } from "@/lib/hooks/use-finance"
 import { useSalesOrders } from "@/lib/hooks/use-sales"
 import { useTaxRules } from "@/lib/hooks/use-finance"
 import { Button } from "@/components/ui/button"
@@ -12,6 +13,9 @@ import { Label } from "@/components/ui/label"
 import { SearchableCombobox } from "@/components/shared/searchable-combobox"
 import type { IssueInvoiceRequest } from "@/lib/types/finance"
 import { useAuth } from "@/lib/hooks/use-auth"
+import { useToast } from "@/hooks/use-toast"
+import { parseApiError } from "@/lib/api/parse-api-error"
+import { showApiErrorToast } from "@/lib/api/show-api-error-toast"
 
 interface IssueInvoiceDialogProps {
   open: boolean
@@ -23,7 +27,9 @@ export function IssueInvoiceDialog({ open, onOpenChange, onSuccess }: IssueInvoi
   const issueMutation = useIssueInvoice()
   const { data: salesOrders } = useSalesOrders()
   const { data: taxRules } = useTaxRules()
+  const { data: invoices = [] } = useInvoices()
   const { hasPermission } = useAuth()
+  const toast = useToast()
 
   const {
     register,
@@ -31,6 +37,7 @@ export function IssueInvoiceDialog({ open, onOpenChange, onSuccess }: IssueInvoi
     reset,
     watch,
     setValue,
+    setError,
     formState: { errors },
   } = useForm<IssueInvoiceRequest>({
     defaultValues: {
@@ -54,14 +61,34 @@ export function IssueInvoiceDialog({ open, onOpenChange, onSuccess }: IssueInvoi
 
   const onSubmit = async (data: IssueInvoiceRequest) => {
     if (!hasPermission("invoice:issue")) return
-    const result = await issueMutation.mutateAsync(data)
-    onOpenChange(false)
-    if (onSuccess) {
-      onSuccess(result.id)
+
+    try {
+      const result = await issueMutation.mutateAsync(data)
+      onOpenChange(false)
+      if (onSuccess) {
+        onSuccess(result.id)
+      }
+    } catch (e) {
+      const parsed = parseApiError(e as AxiosError)
+
+      if (parsed.type === "validation") {
+        Object.entries(parsed.fieldErrors).forEach(([field, message]) => {
+          setError(field as keyof IssueInvoiceRequest, { message })
+        })
+        return
+      }
+
+      showApiErrorToast(parsed, toast, "Failed to issue invoice")
     }
   }
 
-  const deliveredOrders = salesOrders?.filter((order) => order.status === "delivered") || []
+  const invoicedSalesOrderIds = new Set(
+      invoices
+        .filter(inv => inv.sales_order_id)
+        .map(inv => inv.sales_order_id)
+    )
+
+  const deliveredOrders = salesOrders?.filter((order) => order.status === "delivered" && !invoicedSalesOrderIds.has(order.id)) || []
 
   const salesOrderOptions = deliveredOrders.map((order) => ({
     value: order.id,
@@ -104,7 +131,7 @@ export function IssueInvoiceDialog({ open, onOpenChange, onSuccess }: IssueInvoi
               <Input
                 id="invoiceDate"
                 type="date"
-                {...register("invoiceDate", { required: "Invoice date is required" })}
+                {...register("invoiceDate")}
               />
               {errors.invoiceDate && <p className="text-sm text-destructive">{errors.invoiceDate.message}</p>}
             </div>
@@ -115,9 +142,7 @@ export function IssueInvoiceDialog({ open, onOpenChange, onSuccess }: IssueInvoi
                 id="dueDays"
                 type="number"
                 {...register("dueDays", {
-                  required: "Due days is required",
                   valueAsNumber: true,
-                  min: { value: 0, message: "Must be 0 or more" },
                 })}
               />
               {errors.dueDays && <p className="text-sm text-destructive">{errors.dueDays.message}</p>}

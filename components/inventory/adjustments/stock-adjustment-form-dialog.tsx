@@ -1,12 +1,18 @@
 "use client"
 
-import type React from "react"
-import { useState } from "react"
+import { useEffect } from "react"
+import { useForm } from "react-hook-form"
+import type { AxiosError } from "axios"
+
 import { useCreateStockAdjustment } from "@/lib/hooks/use-stock-adjustments"
-import { useProducts } from "@/lib/hooks/use-products"
 import { useWarehouses } from "@/lib/hooks/use-warehouses"
 import { useShops } from "@/lib/hooks/use-shops"
 import { useStockByLocation } from "@/lib/hooks/use-stock-by-location"
+
+import { parseApiError } from "@/lib/api/parse-api-error"
+import { showApiErrorToast } from "@/lib/api/show-api-error-toast"
+import { useToast } from "@/hooks/use-toast"
+
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -22,80 +28,121 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { SearchableSelect } from "@/components/shared/searchable-select"
 import { useAuth } from "@/lib/hooks/use-auth"
 
+type StockAdjustmentFormValues = {
+  productId: string
+  locationType: "warehouse" | "shop"
+  locationId: string
+  direction: "in" | "out"
+  quantity: string
+  reason: string
+}
+
 interface StockAdjustmentFormDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
 }
 
-export function StockAdjustmentFormDialog({ open, onOpenChange }: StockAdjustmentFormDialogProps) {
-  const [formData, setFormData] = useState({
-    productId: "",
-    locationType: "warehouse" as const,
-    locationId: "",
-    direction: "in" as const,
-    quantity: "",
-    reason: "",
-  })
+export function StockAdjustmentFormDialog({
+  open,
+  onOpenChange,
+}: StockAdjustmentFormDialogProps) {
+  const toast = useToast()
+  const { hasPermission } = useAuth()
+  const createMutation = useCreateStockAdjustment()
 
-  const { hasPermission }  = useAuth()
-  const { data: products } = useProducts()
   const { data: warehouses } = useWarehouses()
   const { data: shops } = useShops()
-  const { data: stockAtLocation } = useStockByLocation(formData.locationType, formData.locationId)
-  const createMutation = useCreateStockAdjustment()
+
+  const {
+    register,
+    handleSubmit,
+    watch,
+    reset,
+    setError,
+    formState: { errors },
+  } = useForm<StockAdjustmentFormValues>({
+    defaultValues: {
+      productId: "",
+      locationType: "warehouse",
+      locationId: "",
+      direction: "in",
+      quantity: "",
+      reason: "",
+    },
+  })
+
+  useEffect(() => {
+    if (!open) {
+      reset({
+        productId: "",
+        locationType: "warehouse",
+        locationId: "",
+        direction: "in",
+        quantity: "",
+        reason: "",
+      })
+    }
+  }, [open, reset])
+
+  const locationType = watch("locationType")
+  const locationId = watch("locationId")
+
+  const { data: stockAtLocation } = useStockByLocation(locationType, locationId)
 
   const availableProducts =
     stockAtLocation?.map((stock) => ({
       id: stock.product.id,
-      name: `${stock.product.name} (${stock.product.sku}) - On Hand: ${stock.onHand}`,
+      name: `${stock.product.name} (${stock.product.sku})`,
       label: `${stock.product.name} - On Hand: ${stock.onHand}`,
     })) || []
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
+  const warehouseOptions =
+    warehouses?.map((w) => ({ id: w.id, name: w.name, label: w.name })) || []
 
-    createMutation.mutate(formData, {
-      onSuccess: () => {
+  const shopOptions =
+    shops?.map((s) => ({ id: s.id, name: s.name, label: s.name })) || []
+
+  const onSubmit = (values: StockAdjustmentFormValues) => {
+    createMutation
+      .mutateAsync(values)
+      .then(() => {
+        toast.success("Stock adjustment created")
         onOpenChange(false)
-        setFormData({
-          productId: "",
-          locationType: "warehouse",
-          locationId: "",
-          direction: "in",
-          quantity: "",
-          reason: "",
-        })
-      },
-    })
+      })
+      .catch((e: AxiosError) => {
+        const parsed = parseApiError(e)
+
+        if (parsed.type === "validation") {
+          Object.entries(parsed.fieldErrors).forEach(([field, message]) => {
+            setError(field as keyof StockAdjustmentFormValues, { message })
+          })
+          return
+        }
+
+        showApiErrorToast(parsed, toast)
+      })
   }
 
-  const warehouseOptions = (warehouses || []).map((w) => ({
-    id: w.id,
-    name: w.name,
-    label: w.name,
-  }))
-
-  const shopOptions = (shops || []).map((s) => ({
-    id: s.id,
-    name: s.name,
-    label: s.name,
-  }))
+  const isPending = createMutation.isPending
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>Create Stock Adjustment</DialogTitle>
-          <DialogDescription>Adjust stock quantities for a product at a location</DialogDescription>
+          <DialogDescription>
+            Adjust stock quantities for a product at a location
+          </DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
+
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="space-y-2">
             <Label>Location Type</Label>
             <Select
-              value={formData.locationType}
+              value={locationType}
               onValueChange={(value) =>
-                setFormData({
-                  ...formData,
+                reset({
+                  ...watch(),
                   locationType: value as any,
                   locationId: "",
                   productId: "",
@@ -115,30 +162,34 @@ export function StockAdjustmentFormDialog({ open, onOpenChange }: StockAdjustmen
           <div className="space-y-2">
             <Label>Location</Label>
             <SearchableSelect
-              value={formData.locationId}
+              value={locationId}
               onValueChange={(value) =>
-                setFormData({
-                  ...formData,
-                  locationId: value,
-                  productId: "",
-                })
+                reset({ ...watch(), locationId: value, productId: "" })
               }
-              options={formData.locationType === "warehouse" ? warehouseOptions : shopOptions}
+              options={locationType === "warehouse" ? warehouseOptions : shopOptions}
               placeholder="Select location"
               searchPlaceholder="Search locations..."
             />
+            {errors.locationId?.message && (
+              <p className="text-sm text-destructive">{errors.locationId.message}</p>
+            )}
           </div>
 
-          {formData.locationId && (
+          {locationId && (
             <div className="space-y-2">
               <Label>Product</Label>
               <SearchableSelect
-                value={formData.productId}
-                onValueChange={(value) => setFormData({ ...formData, productId: value })}
+                value={watch("productId")}
+                onValueChange={(value) =>
+                  reset({ ...watch(), productId: value })
+                }
                 options={availableProducts}
                 placeholder="Select product"
                 searchPlaceholder="Search products..."
               />
+              {errors.productId?.message && (
+                <p className="text-sm text-destructive">{errors.productId.message}</p>
+              )}
             </div>
           )}
 
@@ -146,8 +197,10 @@ export function StockAdjustmentFormDialog({ open, onOpenChange }: StockAdjustmen
             <div className="space-y-2">
               <Label>Direction</Label>
               <Select
-                value={formData.direction}
-                onValueChange={(value) => setFormData({ ...formData, direction: value as any })}
+                value={watch("direction")}
+                onValueChange={(value) =>
+                  reset({ ...watch(), direction: value as any })
+                }
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -160,40 +213,53 @@ export function StockAdjustmentFormDialog({ open, onOpenChange }: StockAdjustmen
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="quantity">Quantity</Label>
-              <Input
-                id="quantity"
-                type="number"
-                min="1"
-                value={formData.quantity}
-                onChange={(e) => setFormData({ ...formData, quantity: e.target.value })}
-                required
-              />
+              <Label>Quantity</Label>
+              <Input type="number" {...register("quantity")} />
+              {errors.quantity?.message && (
+                <p className="text-sm text-destructive">{errors.quantity.message}</p>
+              )}
             </div>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="reason">Reason</Label>
-            <Select value={formData.reason} onValueChange={(value) => setFormData({ ...formData, reason: value })}>
+            <Label>Reason</Label>
+            <Select
+              value={watch("reason")}
+              onValueChange={(value) =>
+                reset({ ...watch(), reason: value })
+              }
+            >
               <SelectTrigger>
                 <SelectValue placeholder="Select reason" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="year_end_reconciliation">Year End Reconciliation</SelectItem>
-                <SelectItem value="inventory_count_variance">Inventory Count Variance</SelectItem>
-                <SelectItem value="damage_replacement">Damage Replacement</SelectItem>
+                <SelectItem value="year_end_reconciliation">
+                  Year End Reconciliation
+                </SelectItem>
+                <SelectItem value="inventory_count_variance">
+                  Inventory Count Variance
+                </SelectItem>
+                <SelectItem value="damage_replacement">
+                  Damage Replacement
+                </SelectItem>
                 <SelectItem value="theft_loss">Theft/Loss</SelectItem>
                 <SelectItem value="other">Other</SelectItem>
               </SelectContent>
             </Select>
+            {errors.reason?.message && (
+              <p className="text-sm text-destructive">{errors.reason.message}</p>
+            )}
           </div>
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={!hasPermission("stock.adjustment:create") || createMutation.isPending || !formData.locationId || !formData.productId}>
-              {createMutation.isPending ? "Creating..." : "Create Adjustment"}
+            <Button
+              type="submit"
+              disabled={!hasPermission("stock.adjustment:create") || isPending}
+            >
+              {isPending ? "Creating..." : "Create Adjustment"}
             </Button>
           </DialogFooter>
         </form>

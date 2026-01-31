@@ -13,6 +13,9 @@ import { SearchableCombobox } from "@/components/shared/searchable-combobox"
 import { useToast } from "@/hooks/use-toast"
 import type { PurchaseShipment, UpdateShipmentRequest } from "@/lib/types/purchase"
 import { useEffect, useState } from "react"
+import type { AxiosError } from "axios"
+import { parseApiError } from "@/lib/api/parse-api-error"
+import { showApiErrorToast } from "@/lib/api/show-api-error-toast"
 
 interface UpdateShipmentDialogProps {
   shipment: PurchaseShipment
@@ -21,10 +24,11 @@ interface UpdateShipmentDialogProps {
 }
 
 export function UpdateShipmentDialog({ shipment, open, onOpenChange }: UpdateShipmentDialogProps) {
-  const { toast } = useToast()
+  const toast = useToast()
   const updateMutation = useUpdateShipment()
   const { data: warehouses = [] } = useWarehouses()
   const { data: shops = [] } = useShops()
+
   const [locationType, setLocationType] = useState<"warehouse" | "shop">(
     shipment.receiving_warehouse_id ? "warehouse" : "shop",
   )
@@ -56,27 +60,19 @@ export function UpdateShipmentDialog({ shipment, open, onOpenChange }: UpdateShi
 
   const onSubmit = async (data: UpdateShipmentRequest) => {
     if (!canEdit) {
-      toast({
-        title: "Cannot Edit",
-        description: "Shipment header can only be edited in draft, in_transit, arrived, or cleared status",
-        variant: "destructive",
-      })
+      toast.error(
+        "Cannot Edit",
+        "Shipment header can only be edited in draft, in_transit, arrived, or cleared status",
+      )
       return
     }
 
     try {
       await updateMutation.mutateAsync({ id: shipment.id, data })
-      toast({
-        title: "Success",
-        description: "Shipment updated successfully",
-      })
+      toast.success("Shipment updated", "Shipment updated successfully")
       onOpenChange(false)
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.response?.data?.message || "Failed to update shipment",
-        variant: "destructive",
-      })
+    } catch (e) {
+      showApiErrorToast(parseApiError(e as AxiosError), toast, "Failed to update shipment")
     }
   }
 
@@ -103,16 +99,27 @@ export function UpdateShipmentDialog({ shipment, open, onOpenChange }: UpdateShi
             </p>
           )}
         </DialogHeader>
+
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="departure_date">Departure Date</Label>
-              <Input id="departure_date" type="date" {...register("departure_date")} disabled={!canEdit} />
+              <Input
+                id="departure_date"
+                type="date"
+                {...register("departure_date")}
+                disabled={!canEdit}
+              />
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="arrival_date">Arrival Date</Label>
-              <Input id="arrival_date" type="date" {...register("arrival_date")} disabled={!canEdit} />
+              <Input
+                id="arrival_date"
+                type="date"
+                {...register("arrival_date")}
+                disabled={!canEdit}
+              />
             </div>
           </div>
 

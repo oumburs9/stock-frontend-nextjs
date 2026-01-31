@@ -1,10 +1,21 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { expenseTypeService } from "@/lib/services/purchase.service"
-import type { CreateExpenseTypeRequest, UpdateExpenseTypeRequest } from "@/lib/types/purchase"
-import { toast } from "@/hooks/use-toast"
+"use client"
 
-export function useExpenseTypes(params?: { q?: string; scope?: "shipment" | "batch"; active?: boolean }) {
-  return useQuery({
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import type { AxiosError } from "axios"
+
+import { expenseTypeService } from "@/lib/services/purchase.service"
+import type {
+  CreateExpenseTypeRequest,
+  UpdateExpenseTypeRequest,
+  ExpenseType,
+} from "@/lib/types/purchase"
+
+export function useExpenseTypes(params?: {
+  q?: string
+  scope?: "shipment" | "batch"
+  active?: boolean
+}) {
+  return useQuery<ExpenseType[], AxiosError>({
     queryKey: ["expense-types", params],
     queryFn: async () => {
       const data = await expenseTypeService.getExpenseTypes(params)
@@ -15,7 +26,7 @@ export function useExpenseTypes(params?: { q?: string; scope?: "shipment" | "bat
 }
 
 export function useExpenseType(id: string | null) {
-  return useQuery({
+  return useQuery<ExpenseType | null, AxiosError>({
     queryKey: ["expense-types", id],
     queryFn: () => (id ? expenseTypeService.getExpenseType(id) : null),
     enabled: !!id,
@@ -25,18 +36,10 @@ export function useExpenseType(id: string | null) {
 export function useCreateExpenseType() {
   const queryClient = useQueryClient()
 
-  return useMutation({
-    mutationFn: (data: CreateExpenseTypeRequest) => expenseTypeService.createExpenseType(data),
+  return useMutation<ExpenseType, AxiosError, CreateExpenseTypeRequest>({
+    mutationFn: (data) => expenseTypeService.createExpenseType(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["expense-types"] })
-      toast({ title: "Expense type created successfully" })
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Failed to create expense type",
-        description: error?.response?.data?.message || error.message,
-        variant: "destructive",
-      })
     },
   })
 }
@@ -44,19 +47,15 @@ export function useCreateExpenseType() {
 export function useUpdateExpenseType() {
   const queryClient = useQueryClient()
 
-  return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: UpdateExpenseTypeRequest }) =>
+  return useMutation<
+    ExpenseType,
+    AxiosError,
+    { id: string; data: UpdateExpenseTypeRequest }
+  >({
+    mutationFn: ({ id, data }) =>
       expenseTypeService.updateExpenseType(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["expense-types"] })
-      toast({ title: "Expense type updated successfully" })
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Failed to update expense type",
-        description: error?.response?.data?.message || error.message,
-        variant: "destructive",
-      })
     },
   })
 }
@@ -64,18 +63,10 @@ export function useUpdateExpenseType() {
 export function useDeleteExpenseType() {
   const queryClient = useQueryClient()
 
-  return useMutation({
-    mutationFn: (id: string) => expenseTypeService.deleteExpenseType(id),
+  return useMutation<void, AxiosError, string>({
+    mutationFn: (id) => expenseTypeService.deleteExpenseType(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["expense-types"] })
-      toast({ title: "Expense type deleted successfully" })
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Failed to delete expense type",
-        description: error?.response?.data?.message || error.message,
-        variant: "destructive",
-      })
     },
   })
 }

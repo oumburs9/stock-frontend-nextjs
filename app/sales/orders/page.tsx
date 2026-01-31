@@ -81,7 +81,7 @@ export default function SalesOrdersPage() {
 
         <SalesOrderTable searchQuery={searchQuery} statusFilter={statusFilter} />
 
-        <SalesOrderFormDialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen} />
+        <SalesOrderFormDialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen} salesOrder={null} />
       </div>
       </RequirePermission>
     </DashboardLayout>

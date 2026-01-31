@@ -17,6 +17,10 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import type { Role } from "@/lib/types/role"
+import type { AxiosError } from "axios"
+import { parseApiError } from "@/lib/api/parse-api-error"
+import { showApiErrorToast } from "@/lib/api/show-api-error-toast"
+import { useToast } from "@/hooks/use-toast"
 
 interface RolePermissionsDialogProps {
   role: Role | null
@@ -31,6 +35,7 @@ export function RolePermissionsDialog({ role, open, onOpenChange }: RolePermissi
   const { data: allPermissions } = usePermissions()
   const { data: rolePermissions } = useRolePermissions(role?.id || null)
   const updateMutation = useUpdateRolePermissions()
+  const toast = useToast()
 
   useEffect(() => {
     if (rolePermissions) {
@@ -54,20 +59,22 @@ export function RolePermissionsDialog({ role, open, onOpenChange }: RolePermissi
   }
 
   const handleSubmit = () => {
-    if (role) {
-      console.log('rool', role)
-      updateMutation.mutate(
-        {
-          id: role.id,
-          permissionIds: selectedPermissions,
+    if (!role) return
+
+    updateMutation.mutate(
+      {
+        id: role.id,
+        permissionIds: selectedPermissions,
+      },
+      {
+        onSuccess: () => {
+          toast.success("Permissions updated", "Role permissions were updated successfully.")
+          onOpenChange(false)
         },
-        {
-          onSuccess: () => {
-            onOpenChange(false)
-          },
-        },
-      )
-    }
+        onError: (e: AxiosError) =>
+          showApiErrorToast(parseApiError(e), toast, "Failed to update permissions."),
+      },
+    )
   }
 
   return (

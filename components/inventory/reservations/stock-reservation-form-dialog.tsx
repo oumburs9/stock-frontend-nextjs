@@ -1,11 +1,17 @@
 "use client"
 
-import type React from "react"
-import { useState } from "react"
+import { useEffect, useMemo, useState } from "react"
+import { useForm, Controller } from "react-hook-form"
+import type { AxiosError } from "axios"
+
 import { useCreateStockReservation } from "@/lib/hooks/use-stock-reservations"
 import { useStockByLocation } from "@/lib/hooks/use-stock-by-location"
 import { useWarehouses } from "@/lib/hooks/use-warehouses"
 import { useShops } from "@/lib/hooks/use-shops"
+import { parseApiError } from "@/lib/api/parse-api-error"
+import { showApiErrorToast } from "@/lib/api/show-api-error-toast"
+import { useToast } from "@/hooks/use-toast"
+
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -26,107 +32,144 @@ interface StockReservationFormDialogProps {
   onOpenChange: (open: boolean) => void
 }
 
+type StockReservationFormValues = {
+  locationType: "warehouse" | "shop"
+  locationId: string
+  productId: string
+  salesOrderId: string
+  quantity: string
+}
+
 export function StockReservationFormDialog({ open, onOpenChange }: StockReservationFormDialogProps) {
-  const [formData, setFormData] = useState({
-    productId: "",
-    locationType: "warehouse" as "warehouse" | "shop",
-    locationId: "",
-    salesOrderId: "",
-    quantity: "",
-  })
-  const [selectedProduct, setSelectedProduct] = useState<{ id: string; available: number } | null>(null)
+  const toast = useToast()
 
   const { hasPermission } = useAuth()
   const { data: warehouses } = useWarehouses()
   const { data: shops } = useShops()
-  const { data: stockAtLocation } = useStockByLocation(formData.locationType, formData.locationId)
+
   const createMutation = useCreateStockReservation()
 
-  const availableProducts =
-    stockAtLocation
-      ?.filter((stock) => stock.available > 0)
-      .map((stock) => ({
-        id: stock.product.id,
-        name: `${stock.product.name} (${stock.product.sku})`,
-        label: `${stock.product.name} - Available: ${stock.available}`,
-        available: stock.available,
-      })) || []
-
-  const handleLocationChange = (value: string) => {
-    setFormData({
-      ...formData,
-      locationId: value,
+  const {
+    control,
+    register,
+    handleSubmit,
+    reset,
+    setError,
+    watch,
+    formState: { errors },
+  } = useForm<StockReservationFormValues>({
+    defaultValues: {
+      locationType: "warehouse",
+      locationId: "",
       productId: "",
-    })
-    setSelectedProduct(null)
-  }
+      salesOrderId: "",
+      quantity: "",
+    },
+  })
 
-  const handleProductChange = (value: string) => {
-    const product = availableProducts.find((p) => p.id === value)
-    setFormData({ ...formData, productId: value })
-    setSelectedProduct(product ? { id: value, available: product.available } : null)
-  }
+  const [formError, setFormError] = useState<string | null>(null)
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
+  const locationType = watch("locationType")
+  const locationId = watch("locationId")
+  const productId = watch("productId")
 
-    if (!formData.locationId || !formData.productId || !formData.salesOrderId || !formData.quantity) {
-      return
-    }
+  const { data: stockAtLocation } = useStockByLocation(locationType, locationId)
 
-    const quantity = Number.parseInt(formData.quantity, 10)
-    if (selectedProduct && quantity > selectedProduct.available) {
-      alert(`Cannot reserve more than available quantity (${selectedProduct.available})`)
-      return
-    }
+  const availableProducts = useMemo(() => {
+    return (
+      stockAtLocation
+        ?.filter((stock) => stock.available > 0)
+        .map((stock) => ({
+          id: stock.product.id,
+          name: `${stock.product.name} (${stock.product.sku})`,
+          label: `${stock.product.name} - Available: ${stock.available}`,
+          available: stock.available,
+        })) || []
+    )
+  }, [stockAtLocation])
 
-    const data = {
-      productId: formData.productId,
-      salesOrderId: formData.salesOrderId,
-      quantity: formData.quantity,
-      ...(formData.locationType === "warehouse" && { warehouseId: formData.locationId }),
-      ...(formData.locationType === "shop" && { shopId: formData.locationId }),
-    }
+  const selectedProduct = useMemo(() => {
+    const product = availableProducts.find((p) => p.id === productId)
+    return product ? { id: productId, available: product.available } : null
+  }, [availableProducts, productId])
 
-    createMutation.mutate(data, {
-      onSuccess: () => {
-        onOpenChange(false)
-        setFormData({
-          productId: "",
-          locationType: "warehouse",
-          locationId: "",
-          salesOrderId: "",
-          quantity: "",
-        })
-        setSelectedProduct(null)
-      },
-    })
-  }
+  const warehouseOptions = useMemo(
+    () =>
+      (warehouses || []).map((w) => ({
+        id: w.id,
+        name: w.name,
+        label: w.name,
+      })),
+    [warehouses],
+  )
 
-  const warehouseOptions = (warehouses || []).map((w) => ({
-    id: w.id,
-    name: w.name,
-    label: w.name,
-  }))
+  const shopOptions = useMemo(
+    () =>
+      (shops || []).map((s) => ({
+        id: s.id,
+        name: s.name,
+        label: s.name,
+      })),
+    [shops],
+  )
 
-  const shopOptions = (shops || []).map((s) => ({
-    id: s.id,
-    name: s.name,
-    label: s.name,
-  }))
-
-  const handleOpenChange = (newOpen: boolean) => {
-    if (!newOpen) {
-      setFormData({
-        productId: "",
+  useEffect(() => {
+    if (!open) {
+      setFormError(null)
+      reset({
         locationType: "warehouse",
         locationId: "",
+        productId: "",
         salesOrderId: "",
         quantity: "",
       })
-      setSelectedProduct(null)
+    }
+  }, [open, reset])
+
+  const handleOpenChange = (newOpen: boolean) => {
+    if (!newOpen) {
+      setFormError(null)
+      reset({
+        locationType: "warehouse",
+        locationId: "",
+        productId: "",
+        salesOrderId: "",
+        quantity: "",
+      })
     }
     onOpenChange(newOpen)
+  }
+
+  const onSubmit = (values: StockReservationFormValues) => {
+    setFormError(null)
+
+    const data = {
+      productId: values.productId,
+      salesOrderId: values.salesOrderId,
+      quantity: values.quantity,
+      ...(values.locationType === "warehouse" && { warehouseId: values.locationId }),
+      ...(values.locationType === "shop" && { shopId: values.locationId }),
+    }
+
+    createMutation
+      .mutateAsync(data)
+      .then(() => {
+        toast.success("Reservation created", "The reservation was created successfully.")
+        handleOpenChange(false)
+      })
+      .catch((e: AxiosError) => {
+        const parsed = parseApiError(e)
+
+        if (parsed.type === "validation") {
+          Object.entries(parsed.fieldErrors).forEach(([field, message]) => {
+            setError(field as keyof StockReservationFormValues, { message })
+          })
+          if (parsed.formError) setFormError(parsed.formError)
+          return
+        }
+
+        showApiErrorToast(parsed, toast, "Failed to create reservation.")
+      })
   }
 
   return (
@@ -136,58 +179,102 @@ export function StockReservationFormDialog({ open, onOpenChange }: StockReservat
           <DialogTitle>Create Stock Reservation</DialogTitle>
           <DialogDescription>Reserve stock for a sales order</DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
+
+        {formError && (
+          <div className="rounded-md border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">
+            {formError}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="space-y-2">
             <Label>Location Type</Label>
-            <Select
-              value={formData.locationType}
-              onValueChange={(value) => {
-                setFormData({
-                  ...formData,
-                  locationType: value as "warehouse" | "shop",
-                  locationId: "",
-                  productId: "",
-                })
-                setSelectedProduct(null)
-              }}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="warehouse">Warehouse</SelectItem>
-                <SelectItem value="shop">Shop</SelectItem>
-              </SelectContent>
-            </Select>
+            <Controller
+              control={control}
+              name="locationType"
+              render={({ field }) => (
+                <Select
+                  value={field.value}
+                  onValueChange={(value) => {
+                    field.onChange(value as "warehouse" | "shop")
+                    reset(
+                      {
+                        locationType: value as "warehouse" | "shop",
+                        locationId: "",
+                        productId: "",
+                        salesOrderId: watch("salesOrderId"),
+                        quantity: watch("quantity"),
+                      },
+                      { keepErrors: true },
+                    )
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="warehouse">Warehouse</SelectItem>
+                    <SelectItem value="shop">Shop</SelectItem>
+                  </SelectContent>
+                </Select>
+              )}
+            />
+            {errors.locationType?.message && <p className="text-sm text-destructive">{errors.locationType.message}</p>}
           </div>
 
           <div className="space-y-2">
             <Label>Location</Label>
-            <SearchableSelect
-              value={formData.locationId}
-              onValueChange={handleLocationChange}
-              options={formData.locationType === "warehouse" ? warehouseOptions : shopOptions}
-              placeholder="Select location"
-              searchPlaceholder="Search locations..."
+            <Controller
+              control={control}
+              name="locationId"
+              render={({ field }) => (
+                <SearchableSelect
+                  value={field.value}
+                  onValueChange={(value) => {
+                    field.onChange(value)
+                    reset(
+                      {
+                        locationType: watch("locationType"),
+                        locationId: value,
+                        productId: "",
+                        salesOrderId: watch("salesOrderId"),
+                        quantity: watch("quantity"),
+                      },
+                      { keepErrors: true },
+                    )
+                  }}
+                  options={locationType === "warehouse" ? warehouseOptions : shopOptions}
+                  placeholder="Select location"
+                  searchPlaceholder="Search locations..."
+                />
+              )}
             />
+            {errors.locationId?.message && <p className="text-sm text-destructive">{errors.locationId.message}</p>}
           </div>
 
-          {formData.locationId && (
+          {locationId && (
             <div className="space-y-2">
               <Label>Product</Label>
               {availableProducts.length > 0 ? (
-                <SearchableSelect
-                  value={formData.productId}
-                  onValueChange={handleProductChange}
-                  options={availableProducts}
-                  placeholder="Select product"
-                  searchPlaceholder="Search products..."
+                <Controller
+                  control={control}
+                  name="productId"
+                  render={({ field }) => (
+                    <SearchableSelect
+                      value={field.value}
+                      onValueChange={(value) => field.onChange(value)}
+                      options={availableProducts}
+                      placeholder="Select product"
+                      searchPlaceholder="Search products..."
+                    />
+                  )}
                 />
               ) : (
                 <div className="text-sm text-muted-foreground p-2 border rounded">
                   No products with available stock at this location
                 </div>
               )}
+              {errors.productId?.message && <p className="text-sm text-destructive">{errors.productId.message}</p>}
             </div>
           )}
 
@@ -200,40 +287,21 @@ export function StockReservationFormDialog({ open, onOpenChange }: StockReservat
 
           <div className="space-y-2">
             <Label htmlFor="salesOrderId">Sales Order ID</Label>
-            <Input
-              id="salesOrderId"
-              placeholder="e.g., SO-2025-001"
-              value={formData.salesOrderId}
-              onChange={(e) => setFormData({ ...formData, salesOrderId: e.target.value })}
-              required
-            />
+            <Input id="salesOrderId" placeholder="e.g., SO-2025-001" {...register("salesOrderId")} />
+            {errors.salesOrderId?.message && <p className="text-sm text-destructive">{errors.salesOrderId.message}</p>}
           </div>
 
           <div className="space-y-2">
             <Label htmlFor="quantity">Quantity to Reserve</Label>
-            <Input
-              id="quantity"
-              type="number"
-              min="1"
-              max={selectedProduct?.available}
-              placeholder="0"
-              value={formData.quantity}
-              onChange={(e) => setFormData({ ...formData, quantity: e.target.value })}
-              required
-            />
+            <Input id="quantity" type="number" placeholder="0" {...register("quantity")} />
+            {errors.quantity?.message && <p className="text-sm text-destructive">{errors.quantity.message}</p>}
           </div>
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => handleOpenChange(false)}>
               Cancel
             </Button>
-            <Button
-              type="submit"
-              disabled={
-                !hasPermission("stock.reservation:create") ||
-                createMutation.isPending || !formData.locationId || !formData.productId || !formData.salesOrderId
-              }
-            >
+            <Button type="submit" disabled={!hasPermission("stock.reservation:create") || createMutation.isPending}>
               {createMutation.isPending ? "Creating..." : "Create Reservation"}
             </Button>
           </DialogFooter>

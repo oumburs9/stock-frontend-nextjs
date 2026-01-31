@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useForm } from "react-hook-form"
+import type { AxiosError } from "axios"
 import { useCreateSalesOrder, useUpdateSalesOrder } from "@/lib/hooks/use-sales"
 import { usePartners } from "@/lib/hooks/use-partners"
 import { useWarehouses } from "@/lib/hooks/use-warehouses"
@@ -16,6 +17,8 @@ import { useToast } from "@/hooks/use-toast"
 import { SearchableCombobox } from "@/components/shared/searchable-combobox"
 import type { SalesOrder, CreateSalesOrderRequest } from "@/lib/types/sales"
 import { useAuth } from "@/lib/hooks/use-auth"
+import { parseApiError } from "@/lib/api/parse-api-error"
+import { showApiErrorToast } from "@/lib/api/show-api-error-toast"
 
 interface SalesOrderFormDialogProps {
   salesOrder: SalesOrder | null
@@ -24,7 +27,7 @@ interface SalesOrderFormDialogProps {
 }
 
 export function SalesOrderFormDialog({ salesOrder, open, onOpenChange }: SalesOrderFormDialogProps) {
-  const { toast } = useToast()
+  const toast = useToast()
   const createMutation = useCreateSalesOrder()
   const updateMutation = useUpdateSalesOrder()
   const { data: customers } = usePartners("customer")
@@ -32,6 +35,7 @@ export function SalesOrderFormDialog({ salesOrder, open, onOpenChange }: SalesOr
   const { data: shops } = useShops()
   const [locationType, setLocationType] = useState<"warehouse" | "shop">("warehouse")
   const { hasPermission } = useAuth()
+  const [formError, setFormError] = useState<string | null>(null)
 
   const {
     register,
@@ -39,6 +43,7 @@ export function SalesOrderFormDialog({ salesOrder, open, onOpenChange }: SalesOr
     reset,
     watch,
     setValue,
+    setError,
     formState: { errors },
   } = useForm<CreateSalesOrderRequest>({
     defaultValues: {
@@ -48,17 +53,17 @@ export function SalesOrderFormDialog({ salesOrder, open, onOpenChange }: SalesOr
       orderDate: new Date().toISOString().split("T")[0],
       currency: "ETB",
       paymentTerms: "cash",
-      notes: null,
+      notes: undefined,
     },
   })
 
   useEffect(() => {
+    setFormError(null)
+
     if (salesOrder) {
-      if (salesOrder.warehouse_id) {
-        setLocationType("warehouse")
-      } else if (salesOrder.shop_id) {
-        setLocationType("shop")
-      }
+      if (salesOrder.warehouse_id) setLocationType("warehouse")
+      else if (salesOrder.shop_id) setLocationType("shop")
+
       reset({
         customerId: salesOrder.customer_id,
         warehouseId: salesOrder.warehouse_id || undefined,
@@ -66,7 +71,7 @@ export function SalesOrderFormDialog({ salesOrder, open, onOpenChange }: SalesOr
         orderDate: salesOrder.order_date,
         currency: salesOrder.currency || "ETB",
         paymentTerms: salesOrder.payment_terms || "cash",
-        notes: salesOrder.notes || null,
+        notes: salesOrder.notes || undefined,
       })
     } else {
       reset({
@@ -76,64 +81,55 @@ export function SalesOrderFormDialog({ salesOrder, open, onOpenChange }: SalesOr
         orderDate: new Date().toISOString().split("T")[0],
         currency: "ETB",
         paymentTerms: "cash",
-        notes: null,
+        notes: undefined,
       })
       setLocationType("warehouse")
     }
   }, [salesOrder, reset])
 
   const onSubmit = async (data: CreateSalesOrderRequest) => {
-    try {
-      const payload: CreateSalesOrderRequest = {
-        ...data,
-        warehouseId: locationType === "warehouse" ? data.warehouseId : undefined,
-        shopId: locationType === "shop" ? data.shopId : undefined,
-      }
+    setFormError(null)
 
+    const payload: CreateSalesOrderRequest = {
+      ...data,
+      warehouseId: locationType === "warehouse" ? data.warehouseId : undefined,
+      shopId: locationType === "shop" ? data.shopId : undefined,
+    }
+
+    try {
       if (salesOrder) {
-        await updateMutation.mutateAsync({
-          id: salesOrder.id,
-          data: payload,
-        })
-        toast({
-          title: "Success",
-          description: "Sales order updated successfully",
-        })
+        await updateMutation.mutateAsync({ id: salesOrder.id, data: payload })
+        toast.success("Sales order updated successfully")
       } else {
         await createMutation.mutateAsync(payload)
-        toast({
-          title: "Success",
-          description: "Sales order created successfully",
-        })
+        toast.success("Sales order created successfully")
       }
+
       onOpenChange(false)
       reset()
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.response?.data?.message || "An error occurred",
-        variant: "destructive",
-      })
+    } catch (e) {
+      const parsed = parseApiError(e as AxiosError)
+
+      if (parsed.type === "validation") {
+        Object.entries(parsed.fieldErrors).forEach(([field, message]) => {
+          setError(field as keyof CreateSalesOrderRequest, { message })
+        })
+        if (parsed.formError) setFormError(parsed.formError)
+        return
+      }
+
+      showApiErrorToast(parsed, toast)
     }
   }
 
   const customerOptions =
-    customers?.map((customer) => ({
-      value: customer.id,
-      label: customer.name,
-    })) || []
+    customers?.map((customer) => ({ value: customer.id, label: customer.name })) || []
 
   const warehouseOptions =
-    warehouses?.map((warehouse) => ({
-      value: warehouse.id,
-      label: warehouse.name,
-    })) || []
+    warehouses?.map((warehouse) => ({ value: warehouse.id, label: warehouse.name })) || []
 
   const shopOptions =
-    shops?.map((shop) => ({
-      value: shop.id,
-      label: shop.name,
-    })) || []
+    shops?.map((shop) => ({ value: shop.id, label: shop.name })) || []
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -141,6 +137,13 @@ export function SalesOrderFormDialog({ salesOrder, open, onOpenChange }: SalesOr
         <DialogHeader>
           <DialogTitle>{salesOrder ? "Edit Sales Order" : "Create Sales Order"}</DialogTitle>
         </DialogHeader>
+
+        {formError && (
+          <div className="rounded-md border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">
+            {formError}
+          </div>
+        )}
+
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="space-y-2">
             <Label>Customer *</Label>
@@ -152,12 +155,14 @@ export function SalesOrderFormDialog({ salesOrder, open, onOpenChange }: SalesOr
               searchPlaceholder="Search customers..."
               emptyMessage="No customers found."
             />
-            {errors.customerId && <p className="text-sm text-destructive">{errors.customerId.message}</p>}
+            {errors.customerId?.message && (
+              <p className="text-sm text-destructive">{errors.customerId.message}</p>
+            )}
           </div>
 
           <div className="space-y-3">
             <Label>Selling Location *</Label>
-            <Select value={locationType} onValueChange={(value) => setLocationType(value as "warehouse" | "shop")}>
+            <Select value={locationType} onValueChange={(v) => setLocationType(v as "warehouse" | "shop")}>
               <SelectTrigger>
                 <SelectValue placeholder="Select location type" />
               </SelectTrigger>
@@ -193,30 +198,27 @@ export function SalesOrderFormDialog({ salesOrder, open, onOpenChange }: SalesOr
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="orderDate">Order Date *</Label>
-              <Input id="orderDate" type="date" {...register("orderDate", { required: "Order date is required" })} />
-              {errors.orderDate && <p className="text-sm text-destructive">{errors.orderDate.message}</p>}
+              <Input id="orderDate" type="date" {...register("orderDate")} />
+              {errors.orderDate?.message && (
+                <p className="text-sm text-destructive">{errors.orderDate.message}</p>
+              )}
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="currency">Currency *</Label>
-              <Input
-                id="currency"
-                {...register("currency", { required: "Currency is required" })}
-                placeholder="ETB"
-                defaultValue="ETB"
-              />
-              {errors.currency && <p className="text-sm text-destructive">{errors.currency.message}</p>}
+              <Input id="currency" {...register("currency")} placeholder="ETB" defaultValue="ETB" />
+              {errors.currency?.message && (
+                <p className="text-sm text-destructive">{errors.currency.message}</p>
+              )}
             </div>
           </div>
 
           <div className="space-y-2">
             <Label htmlFor="paymentTerms">Payment Terms *</Label>
-            <Input
-              id="paymentTerms"
-              {...register("paymentTerms", { required: "Payment terms required" })}
-              placeholder="cash, credit, etc."
-            />
-            {errors.paymentTerms && <p className="text-sm text-destructive">{errors.paymentTerms.message}</p>}
+            <Input id="paymentTerms" {...register("paymentTerms")} placeholder="cash, credit, etc." />
+            {errors.paymentTerms?.message && (
+              <p className="text-sm text-destructive">{errors.paymentTerms.message}</p>
+            )}
           </div>
 
           <div className="space-y-2">

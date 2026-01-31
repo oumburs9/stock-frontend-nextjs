@@ -30,8 +30,10 @@ const toastVariants = cva(
     variants: {
       variant: {
         default: 'border bg-background text-foreground',
-        destructive:
-          'destructive group border-destructive bg-destructive text-destructive-foreground',
+        destructive: 'destructive group border-red-300 bg-red-50 text-red-900 dark:border-red-800 dark:bg-red-900 dark:text-red-50',
+        success: 'border border-green-300 bg-green-50 text-green-900 dark:border-green-800 dark:bg-green-900 dark:text-green-50',
+        warning: 'border border-yellow-300 bg-yellow-50 text-yellow-900 dark:border-yellow-800 dark:bg-yellow-900 dark:text-yellow-50',
+        info: 'border border-blue-300 bg-blue-50 text-blue-900 dark:border-blue-800 dark:bg-blue-900 dark:text-blue-50',
       },
     },
     defaultVariants: {
@@ -77,7 +79,7 @@ const ToastClose = React.forwardRef<
   <ToastPrimitives.Close
     ref={ref}
     className={cn(
-      'absolute right-2 top-2 rounded-md p-1 text-foreground/50 opacity-0 transition-opacity hover:text-foreground focus:opacity-100 focus:outline-none focus:ring-2 group-hover:opacity-100 group-[.destructive]:text-red-300 group-[.destructive]:hover:text-red-50 group-[.destructive]:focus:ring-red-400 group-[.destructive]:focus:ring-offset-red-600',
+      'absolute right-2 top-2 rounded-md p-1 text-foreground/50 opacity-0 transition-opacity hover:text-foreground focus:opacity-100 focus:outline-none focus:ring-2 group-hover:opacity-100 group-[.destructive]:text-red-700 group-[.destructive]:hover:text-red-900 group-[.destructive]:focus:ring-red-400 group-[.destructive]:focus:ring-offset-red-600 dark:group-[.destructive]:text-red-300 dark:group-[.destructive]:hover:text-red-100 group-[.success]:text-green-700 group-[.success]:hover:text-green-900 dark:group-[.success]:text-green-300 dark:group-[.success]:hover:text-green-100 group-[.warning]:text-yellow-700 group-[.warning]:hover:text-yellow-900 dark:group-[.warning]:text-yellow-300 dark:group-[.warning]:hover:text-yellow-100 group-[.info]:text-blue-700 group-[.info]:hover:text-blue-900 dark:group-[.info]:text-blue-300 dark:group-[.info]:hover:text-blue-100',
       className,
     )}
     toast-close=""
@@ -117,13 +119,12 @@ type ToastProps = React.ComponentPropsWithoutRef<typeof Toast>
 type ToastActionElement = React.ReactElement<typeof ToastAction>
 
 export {
-  type ToastProps,
-  type ToastActionElement,
-  ToastProvider,
-  ToastViewport,
   Toast,
-  ToastTitle,
-  ToastDescription,
-  ToastClose,
   ToastAction,
+  ToastClose,
+  ToastDescription,
+  ToastProvider,
+  ToastTitle,
+  ToastViewport,
+  type VariantProps, type ToastProps, type ToastActionElement,
 }

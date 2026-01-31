@@ -72,6 +72,15 @@ export function useAgentSales() {
   })
 }
 
+export function useAgentSalesByPayable(payableId: string | null) {
+  return useQuery({
+    queryKey: ["agent-sales", "by-payable", payableId],
+    queryFn: () => agentSalesService.getAgentSales({ payable_id: payableId! }),
+    enabled: !!payableId,
+  })
+}
+
+
 export function useAgentSale(id: string | null) {
   return useQuery({
     queryKey: ["agent-sales", id],

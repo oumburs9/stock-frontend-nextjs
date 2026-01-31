@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import type { AxiosError } from "axios"
 import { MoreHorizontal, Search, ChevronLeft, ChevronRight, Check, X, Plus, Eye } from "lucide-react"
 import { useStockReservations, useReleaseReservation, useConsumeReservation } from "@/lib/hooks/use-stock-reservations"
 import { Button } from "@/components/ui/button"
@@ -28,16 +29,24 @@ import { Card, CardContent } from "@/components/ui/card"
 import type { StockReservation } from "@/lib/types/inventory"
 import { useSalesOrders } from "@/lib/hooks/use-sales"
 import { useAuth } from "@/lib/hooks/use-auth"
+import { ConfirmDeleteDialog } from "@/components/shared/confirm-delete-dialog"
+import { parseApiError } from "@/lib/api/parse-api-error"
+import { showApiErrorToast } from "@/lib/api/show-api-error-toast"
+import { useToast } from "@/hooks/use-toast"
 
 export function StockReservationTable() {
   const [search, setSearch] = useState("")
   const [page, setPage] = useState(1)
   const [open, setOpen] = useState(false)
   const [selectedReservation, setSelectedReservation] = useState<StockReservation | null>(null)
+  const [reservationToRelease, setReservationToRelease] = useState<StockReservation | null>(null)
+  const [reservationToConsume, setReservationToConsume] = useState<StockReservation | null>(null)
+
+  const toast = useToast()
 
   const { hasPermission } = useAuth()
   const { data: reservations, isLoading } = useStockReservations()
-  const {data: salesOrders} = useSalesOrders()
+  const { data: salesOrders } = useSalesOrders()
   // console.log('salesOrders: ',salesOrders)
   const releaseMutation = useReleaseReservation()
   const consumeMutation = useConsumeReservation()
@@ -63,6 +72,30 @@ export function StockReservationTable() {
     return <Badge className={statusClasses[status] || ""}>{status}</Badge>
   }
 
+  const confirmRelease = () => {
+    if (!reservationToRelease) return
+
+    releaseMutation.mutate(reservationToRelease.id, {
+      onSuccess: () => {
+        toast.success("Reservation released", "The reservation was released successfully.")
+        setReservationToRelease(null)
+      },
+      onError: (e: AxiosError) => showApiErrorToast(parseApiError(e), toast, "Failed to release reservation."),
+    })
+  }
+
+  const confirmConsume = () => {
+    if (!reservationToConsume) return
+
+    consumeMutation.mutate(reservationToConsume.id, {
+      onSuccess: () => {
+        toast.success("Reservation consumed", "The reservation was consumed successfully.")
+        setReservationToConsume(null)
+      },
+      onError: (e: AxiosError) => showApiErrorToast(parseApiError(e), toast, "Failed to consume reservation."),
+    })
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -82,7 +115,8 @@ export function StockReservationTable() {
           <Button onClick={() => setOpen(true)}>
             <Plus className="h-4 w-4 mr-2" />
             New Reservation
-          </Button>)}
+          </Button>
+        )}
       </div>
 
       <div className="rounded-md border">
@@ -137,21 +171,18 @@ export function StockReservationTable() {
                         <DropdownMenuSeparator />
                         {res.status === "active" && (
                           <>
-                          {hasPermission("stock.reservation:consume") && (
-                            <DropdownMenuItem
-                              onClick={() => consumeMutation.mutate(res.id)}
-                              disabled={consumeMutation.isPending}
-                            >
-                              <Check className="h-4 w-4 mr-2" />
-                              Consume
-                            </DropdownMenuItem>)}
-                            {hasPermission("stock.reservation:release") && (<DropdownMenuItem
-                              onClick={() => releaseMutation.mutate(res.id)}
-                              disabled={releaseMutation.isPending}
-                            >
-                              <X className="h-4 w-4 mr-2" />
-                              Release
-                            </DropdownMenuItem>)}
+                            {hasPermission("stock.reservation:consume") && (
+                              <DropdownMenuItem onClick={() => setReservationToConsume(res)} disabled={consumeMutation.isPending}>
+                                <Check className="h-4 w-4 mr-2" />
+                                Consume
+                              </DropdownMenuItem>
+                            )}
+                            {hasPermission("stock.reservation:release") && (
+                              <DropdownMenuItem onClick={() => setReservationToRelease(res)} disabled={releaseMutation.isPending}>
+                                <X className="h-4 w-4 mr-2" />
+                                Release
+                              </DropdownMenuItem>
+                            )}
                           </>
                         )}
                       </DropdownMenuContent>
@@ -264,6 +295,24 @@ export function StockReservationTable() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDeleteDialog
+        open={!!reservationToRelease}
+        onOpenChange={(open) => !open && setReservationToRelease(null)}
+        onConfirm={confirmRelease}
+        title="Release Reservation"
+        description="Are you sure you want to release this stock reservation? The reserved quantity will be returned to available stock."
+        itemName={reservationToRelease?.salesOrderId}
+      />
+
+      <ConfirmDeleteDialog
+        open={!!reservationToConsume}
+        onOpenChange={(open) => !open && setReservationToConsume(null)}
+        onConfirm={confirmConsume}
+        title="Consume Reservation"
+        description="Are you sure you want to consume this stock reservation? The reserved quantity will be deducted from available stock."
+        itemName={reservationToConsume?.salesOrderId}
+      />
     </div>
   )
 }

@@ -41,11 +41,14 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { useAuth } from "@/lib/hooks/use-auth"
 import { RequirePermission } from "@/components/auth/require-permission"
+import type { AxiosError } from "axios"
+import { parseApiError } from "@/lib/api/parse-api-error"
+import { showApiErrorToast } from "@/lib/api/show-api-error-toast"
 
 export default function SalesOrderDetailPage() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
-  const { toast } = useToast()
+  const toast = useToast()
   const [showAddItemDialog, setShowAddItemDialog] = useState(false)
   const [showEditItemDialog, setShowEditItemDialog] = useState(false)
   const [selectedItem, setSelectedItem] = useState<SalesOrderItem | null>(null)
@@ -64,6 +67,7 @@ export default function SalesOrderDetailPage() {
   const confirmMutation = useConfirmSalesOrder()
   const deliverMutation = useDeliverSalesOrder()
   const cancelMutation = useCancelSalesOrder()
+  console.log("order: ",order)
 
   const filteredItems = useMemo(() => {
     if (!order?.items || order.items.length === 0) return []
@@ -78,7 +82,7 @@ export default function SalesOrderDetailPage() {
     })
   }, [order, searchQuery, products])
 
-  const totalAmount = order?.items.reduce((sum, item) => sum + Number.parseFloat(item.total_price), 0) || 0
+  const totalAmount = order?.items?.reduce((sum, item) => sum + Number.parseFloat(item.total_price), 0) || 0
 
   const canAddItems = order?.status === "draft"
   const canEditItems = order?.status === "draft" || order?.status === "confirmed" || order?.status === "reserved"
@@ -117,51 +121,36 @@ export default function SalesOrderDetailPage() {
   const handleConfirm = async () => {
     try {
       await confirmMutation.mutateAsync(order.id)
-      toast({
-        title: "Success",
-        description: "Sales order confirmed successfully",
-      })
+      toast.success("Success", "Sales order confirmed successfully")
       setConfirmAction(null)
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.response?.data?.message || "Failed to confirm sales order",
-        variant: "destructive",
-      })
+    } catch (e) {
+      const parsed = parseApiError(e as AxiosError)
+      if (parsed.type === "validation") return
+      showApiErrorToast(parsed, toast, "Failed to confirm sales order")
     }
   }
 
   const handleDeliver = async () => {
     try {
       await deliverMutation.mutateAsync(order.id)
-      toast({
-        title: "Success",
-        description: "Sales order delivered successfully",
-      })
+      toast.success("Success", "Sales order delivered successfully")
       setConfirmAction(null)
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.response?.data?.message || "Failed to deliver sales order",
-        variant: "destructive",
-      })
+    } catch (e) {
+      const parsed = parseApiError(e as AxiosError)
+      if (parsed.type === "validation") return
+      showApiErrorToast(parsed, toast, "Failed to deliver sales order")
     }
   }
 
   const handleCancel = async () => {
     try {
       await cancelMutation.mutateAsync(order.id)
-      toast({
-        title: "Success",
-        description: "Sales order cancelled successfully",
-      })
+      toast.success("Success", "Sales order cancelled successfully")
       setConfirmAction(null)
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.response?.data?.message || "Failed to cancel sales order",
-        variant: "destructive",
-      })
+    } catch (e) {
+      const parsed = parseApiError(e as AxiosError)
+      if (parsed.type === "validation") return
+      showApiErrorToast(parsed, toast, "Failed to cancel sales order")
     }
   }
 
@@ -173,17 +162,12 @@ export default function SalesOrderDetailPage() {
         orderId: order.id,
         itemId: deleteItemId,
       })
-      toast({
-        title: "Success",
-        description: "Item removed from sales order successfully",
-      })
+      toast.success("Success", "Item removed from sales order successfully")
       setDeleteItemId(null)
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.response?.data?.message || "Failed to delete item",
-        variant: "destructive",
-      })
+    } catch (e) {
+      const parsed = parseApiError(e as AxiosError)
+      if (parsed.type === "validation") return
+      showApiErrorToast(parsed, toast, "Failed to delete item")
     }
   }
 

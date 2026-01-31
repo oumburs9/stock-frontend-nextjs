@@ -2,6 +2,7 @@
 
 import { useEffect } from "react"
 import { useForm } from "react-hook-form"
+import type { AxiosError } from "axios"
 import { useCreatePricingRule, useUpdatePricingRule } from "@/lib/hooks/use-sales"
 import { useProducts } from "@/lib/hooks/use-products"
 import { useCategories } from "@/lib/hooks/use-categories"
@@ -16,6 +17,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { SearchableCombobox } from "@/components/shared/searchable-combobox"
 import { Loader2 } from "lucide-react"
 import { useAuth } from "@/lib/hooks/use-auth"
+import { useToast } from "@/hooks/use-toast"
+import { parseApiError } from "@/lib/api/parse-api-error"
+import { showApiErrorToast } from "@/lib/api/show-api-error-toast"
 
 interface PricingRuleFormDialogProps {
   open: boolean
@@ -39,6 +43,7 @@ interface FormData {
 }
 
 export function PricingRuleFormDialog({ open, onOpenChange, pricingRule }: PricingRuleFormDialogProps) {
+  const toast = useToast()
   const createRule = useCreatePricingRule()
   const updateRule = useUpdatePricingRule()
   const { data: products } = useProducts()
@@ -52,6 +57,7 @@ export function PricingRuleFormDialog({ open, onOpenChange, pricingRule }: Prici
     watch,
     setValue,
     reset,
+    setError,
     formState: { errors },
   } = useForm<FormData>({
     defaultValues: {
@@ -86,9 +92,10 @@ export function PricingRuleFormDialog({ open, onOpenChange, pricingRule }: Prici
     }
   }, [pricingRule, reset])
 
-  const onSubmit = (data: FormData) => {
+  const onSubmit = async (data: FormData) => {
     if (pricingRule && !hasPermission("pricing-rule:update")) return
     if (!pricingRule && !hasPermission("pricing-rule:create")) return
+
     const payload: any = {
       name: data.name,
       description: data.description || undefined,
@@ -108,23 +115,28 @@ export function PricingRuleFormDialog({ open, onOpenChange, pricingRule }: Prici
       payload.fixedPrice = data.fixedPrice
     }
 
-    if (pricingRule) {
-      updateRule.mutate(
-        { id: pricingRule.id, data: payload },
-        {
-          onSuccess: () => {
-            onOpenChange(false)
-            reset()
-          },
-        },
-      )
-    } else {
-      createRule.mutate(payload, {
-        onSuccess: () => {
-          onOpenChange(false)
-          reset()
-        },
-      })
+    try {
+      if (pricingRule) {
+        await updateRule.mutateAsync({ id: pricingRule.id, data: payload })
+        toast.success("Pricing rule updated successfully")
+      } else {
+        await createRule.mutateAsync(payload)
+        toast.success("Pricing rule created successfully")
+      }
+
+      onOpenChange(false)
+      reset()
+    } catch (e) {
+      const parsed = parseApiError(e as AxiosError)
+
+      if (parsed.type === "validation") {
+        Object.entries(parsed.fieldErrors).forEach(([field, message]) => {
+          setError(field as keyof FormData, { message })
+        })
+        return
+      }
+
+      showApiErrorToast(parsed, toast, "Failed to save pricing rule")
     }
   }
 
@@ -150,7 +162,7 @@ export function PricingRuleFormDialog({ open, onOpenChange, pricingRule }: Prici
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{pricingRule ? "Edit Pricing Rule" : "Create Pricing Rule"}</DialogTitle>
         </DialogHeader>
@@ -164,7 +176,7 @@ export function PricingRuleFormDialog({ open, onOpenChange, pricingRule }: Prici
               <Label htmlFor="name">Rule Name *</Label>
               <Input
                 id="name"
-                {...register("name", { required: "Name is required" })}
+                {...register("name")}
                 placeholder="e.g., Electronics 25% Margin"
               />
               {errors.name && <p className="text-sm text-destructive">{errors.name.message}</p>}
@@ -273,7 +285,7 @@ export function PricingRuleFormDialog({ open, onOpenChange, pricingRule }: Prici
                     id="marginPercent"
                     type="number"
                     step="0.01"
-                    {...register("marginPercent", { required: "Margin is required" })}
+                    {...register("marginPercent")}
                     placeholder="20"
                     className="pr-8"
                   />
@@ -291,7 +303,7 @@ export function PricingRuleFormDialog({ open, onOpenChange, pricingRule }: Prici
                   id="fixedPrice"
                   type="number"
                   step="0.01"
-                  {...register("fixedPrice", { required: "Fixed price is required" })}
+                  {...register("fixedPrice")}
                   placeholder="1000.00"
                 />
                 <p className="text-xs text-muted-foreground">Set a fixed selling price regardless of cost</p>

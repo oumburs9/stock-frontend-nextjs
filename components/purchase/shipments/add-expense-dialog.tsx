@@ -13,6 +13,9 @@ import { SearchableCombobox } from "@/components/shared/searchable-combobox"
 import type { AddShipmentExpenseRequest } from "@/lib/types/purchase"
 import { useToast } from "@/hooks/use-toast"
 import { useAuth } from "@/lib/hooks/use-auth"
+import type { AxiosError } from "axios"
+import { parseApiError } from "@/lib/api/parse-api-error"
+import { showApiErrorToast } from "@/lib/api/show-api-error-toast"
 
 interface AddExpenseDialogProps {
   shipmentId: string
@@ -21,12 +24,10 @@ interface AddExpenseDialogProps {
 }
 
 export function AddExpenseDialog({ shipmentId, open, onOpenChange }: AddExpenseDialogProps) {
-  const { toast } = useToast()
+  const toast = useToast()
   const addExpenseMutation = useAddShipmentExpense()
-
   const { hasPermission } = useAuth()
-  const { data: expenseTypes = [] } = useExpenseTypes({ scope: "shipment", active: true})
-  // console.log("expenseTypes: " ,expenseTypes )
+  const { data: expenseTypes = [] } = useExpenseTypes({ scope: "shipment", active: true })
 
   const [selectedExpenseType, setSelectedExpenseType] = useState<string>("")
 
@@ -47,34 +48,19 @@ export function AddExpenseDialog({ shipmentId, open, onOpenChange }: AddExpenseD
   const onSubmit = async (data: AddShipmentExpenseRequest) => {
     try {
       await addExpenseMutation.mutateAsync({ id: shipmentId, data })
-      toast({
-        title: "Success",
-        description: "Expense added successfully",
-      })
+      toast.success("Expense added", "Expense added successfully")
       onOpenChange(false)
       reset()
       setSelectedExpenseType("")
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.response?.data?.message || "Failed to add expense",
-        variant: "destructive",
-      })
+    } catch (e) {
+      showApiErrorToast(parseApiError(e as AxiosError), toast, "Failed to add expense")
     }
   }
-
-  // const handleExpenseTypeChange = (value: string) => {
-  //   setSelectedExpenseType(value)
-  //   const expenseType = expenseTypes.find((et) => et.id === value)
-  //   if (expenseType) {
-  //     setValue("type", expenseType.code)
-  //   }
-  // }
 
   const handleExpenseTypeChange = (value: string) => {
     setSelectedExpenseType(value)
     setValue("expense_type_id", value, { shouldValidate: true })
-}
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -82,6 +68,7 @@ export function AddExpenseDialog({ shipmentId, open, onOpenChange }: AddExpenseD
         <DialogHeader>
           <DialogTitle>Add Shipment Expense</DialogTitle>
         </DialogHeader>
+
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="expense-type">Expense Type *</Label>
@@ -96,7 +83,9 @@ export function AddExpenseDialog({ shipmentId, open, onOpenChange }: AddExpenseD
               searchPlaceholder="Search expense types..."
               emptyMessage="No expense types found"
             />
-            {!selectedExpenseType && <p className="text-sm text-destructive">Expense type is required</p>}
+            {!selectedExpenseType && (
+              <p className="text-sm text-destructive">Expense type is required</p>
+            )}
           </div>
 
           <div className="space-y-2">
@@ -111,7 +100,9 @@ export function AddExpenseDialog({ shipmentId, open, onOpenChange }: AddExpenseD
               })}
               placeholder="0.00"
             />
-            {errors.amount && <p className="text-sm text-destructive">{errors.amount.message}</p>}
+            {errors.amount && (
+              <p className="text-sm text-destructive">{errors.amount.message}</p>
+            )}
           </div>
 
           <div className="space-y-2">
@@ -136,15 +127,16 @@ export function AddExpenseDialog({ shipmentId, open, onOpenChange }: AddExpenseD
             >
               Cancel
             </Button>
-            <Button 
-              type="submit" 
+            <Button
+              type="submit"
               disabled={
                 Boolean(
-                addExpenseMutation.isPending || !selectedExpenseType ||
-                !hasPermission("purchase-shipment-expense:add")
+                  addExpenseMutation.isPending ||
+                    !selectedExpenseType ||
+                    !hasPermission("purchase-shipment-expense:add"),
                 )
               }
-                >
+            >
               {addExpenseMutation.isPending ? "Adding..." : "Add Expense"}
             </Button>
           </DialogFooter>

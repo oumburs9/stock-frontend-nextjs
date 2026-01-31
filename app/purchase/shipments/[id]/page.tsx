@@ -30,13 +30,16 @@ import { useProducts } from "@/lib/hooks/use-products"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { RequirePermission } from "@/components/auth/require-permission"
 import { useAuth } from "@/lib/hooks/use-auth"
-
-
+import type { AxiosError } from "axios"
+import { parseApiError } from "@/lib/api/parse-api-error"
+import { showApiErrorToast } from "@/lib/api/show-api-error-toast"
+import { formatCurrency } from "@/lib/utils/currency"
 
 export default function ShipmentDetailPage() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
-  const { toast } = useToast()
+  const toast = useToast()
+
   const [showReceiveDialog, setShowReceiveDialog] = useState(false)
   const [showExpenseDialog, setShowExpenseDialog] = useState(false)
   const [showEditDialog, setShowEditDialog] = useState(false)
@@ -46,13 +49,13 @@ export default function ShipmentDetailPage() {
   const [selectedExpenseForAdjust, setSelectedExpenseForAdjust] = useState<any | null>(null)
 
   const { hasPermission } = useAuth()
-  const { data: shipmentData, isLoading: shipmentLoading, error: shipmentError } = useShipment(id)
-  const { data: suppliersData = [], isLoading: suppliersLoading } = usePartners("supplier")
-  const { data: productsData = [], isLoading: productsLoading } = useProducts()
+  const { data: shipmentData } = useShipment(id)
+  const { data: suppliersData = [] } = usePartners("supplier")
+  const { data: productsData = [] } = useProducts()
 
   const closeMutation = useCloseShipment()
 
-  const shipment = shipmentData 
+  const shipment = shipmentData
   const suppliers = suppliersData
   const products = productsData
 
@@ -83,17 +86,10 @@ export default function ShipmentDetailPage() {
   const handleClose = async () => {
     try {
       await closeMutation.mutateAsync(id)
-      toast({
-        title: "Success",
-        description: "Shipment closed successfully",
-      })
+      toast.success("Shipment closed", "Shipment closed successfully")
       setShowCloseConfirm(false)
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to close shipment",
-        variant: "destructive",
-      })
+    } catch (e) {
+      showApiErrorToast(parseApiError(e as AxiosError), toast, "Failed to close shipment")
     }
   }
 
@@ -107,9 +103,7 @@ export default function ShipmentDetailPage() {
     return <Badge variant={variants[status] || "secondary"}>{status?.replace("_", " ").toUpperCase()}</Badge>
   }
 
-
   const canEditHeader = ["draft", "in_transit", "arrived", "cleared"].includes(shipment?.status)
-
   const canEditItems = shipment?.status === "draft"
   const canAddExpense = !["received", "closed"].includes(shipment?.status)
   const canReceive = ["arrived", "cleared", "partially_received"].includes(shipment?.status)
@@ -140,11 +134,12 @@ export default function ShipmentDetailPage() {
     setShowReceiveDialog(open)
   }
 
-  const totalExpenses = shipment?.expenses
-                        .reduce((sum, exp) => {
-                          const adjSum = exp.adjustments?.reduce((s, adj) => s + Number.parseFloat(adj.amount), 0) || 0
-                          return sum + Number.parseFloat(exp.amount) + adjSum
-                        }, 0) || 0
+  const totalExpenses =
+    shipment?.expenses?.reduce((sum, exp) => {
+      const adjSum =
+        exp.adjustments?.reduce((s, adj) => s + Number.parseFloat(adj.amount), 0) || 0
+      return sum + Number.parseFloat(exp.amount) + adjSum
+    }, 0) || 0
 
   return (
     <DashboardLayout>
@@ -168,8 +163,7 @@ export default function ShipmentDetailPage() {
                 variant="outline"
                 size="sm"
                 onClick={() => setShowEditDialog(true)}
-                disabled={!hasPermission("purchase-shipment:update") || !canEditHeader && !canEditItems}
-                title={canEditHeader || canEditItems ? "Edit shipment" : "Cannot edit in current status"}
+                disabled={!hasPermission("purchase-shipment:update") || (!canEditHeader && !canEditItems)}
               >
                 Edit Details
               </Button>
@@ -178,7 +172,6 @@ export default function ShipmentDetailPage() {
                 size="sm"
                 onClick={() => setShowExpenseDialog(true)}
                 disabled={!hasPermission("purchase-shipment-expense:add") || !canAddExpense}
-                title={canAddExpense ? "Add expense" : "Cannot add expenses to received/closed shipments"}
               >
                 <Plus className="h-3.5 w-3.5 mr-1" />
                 Add Expense
@@ -190,11 +183,7 @@ export default function ShipmentDetailPage() {
                 </Button>
               )}
               {canClose && hasPermission("purchase-shipment:close") && (
-                <Button
-                  variant="destructive"
-                  onClick={() => setShowCloseConfirm(true)}
-                  disabled={closeMutation.isPending}
-                >
+                <Button variant="destructive" onClick={() => setShowCloseConfirm(true)}>
                   <XCircle className="h-4 w-4 mr-2" />
                   Close
                 </Button>
@@ -243,7 +232,7 @@ export default function ShipmentDetailPage() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Total Expenses:</span>
-                  <span className="font-semibold">ETB { totalExpenses.toFixed(2) }</span>
+                  <span className="font-semibold">{formatCurrency(Number(totalExpenses ?? 0), 'ETB')}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Created:</span>
@@ -308,7 +297,6 @@ export default function ShipmentDetailPage() {
                                 variant="outline"
                                 onClick={() => handleReceiveItem(item.id)}
                                 disabled={!hasRemaining}
-                                title={hasRemaining ? "Receive this item" : "Fully received"}
                               >
                                 <PackageCheck className="h-3.5 w-3.5 mr-1" />
                                 Receive
@@ -338,7 +326,7 @@ export default function ShipmentDetailPage() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-6">
-                  {shipment?.expenses.map((expense) => {
+                  {shipment.expenses.map((expense) => {
                     const adjustmentsSum =
                       expense.adjustments?.reduce((sum, adj) => sum + Number.parseFloat(adj.amount), 0) || 0
                     const netAmount = Number.parseFloat(expense.amount) + adjustmentsSum
@@ -355,17 +343,18 @@ export default function ShipmentDetailPage() {
                             </div>
                             <div className="flex items-center gap-4 text-sm text-muted-foreground">
                               <span>Date: {new Date(expense.expense_date).toLocaleDateString()}</span>
-                              <span>Original: {Number.parseFloat(expense.amount).toFixed(2)}</span>
+                              <span>Original: {formatCurrency(Number(expense.amount ?? 0), 'ETB')}</span>
                               {adjustmentsSum !== 0 && (
                                 <span
                                   className={
                                     adjustmentsSum > 0 ? "text-green-600 font-medium" : "text-red-600 font-medium"
                                   }
                                 >
-                                  Adjustments: {adjustmentsSum > 0 ? "+" : ""}ETB {adjustmentsSum.toFixed(2)}
+                                  Adjustments: {adjustmentsSum > 0 ? "+" : ""}
+                                               {formatCurrency(Math.abs(adjustmentsSum), 'ETB')}
                                 </span>
                               )}
-                              <span className="font-semibold text-foreground">Net: {netAmount.toFixed(2)}</span>
+                              <span className="font-semibold text-foreground">Net: {formatCurrency(Number(netAmount ?? 0), 'ETB')}</span>
                             </div>
                           </div>
                           <Button
@@ -373,13 +362,6 @@ export default function ShipmentDetailPage() {
                             variant="outline"
                             onClick={() => setSelectedExpenseForAdjust(expense)}
                             disabled={lacksPermission || blockedByStatus}
-                            title={
-                              lacksPermission
-                                ? "You do not have permission to adjust shipment expenses"
-                                : blockedByStatus
-                                  ? "Cannot adjust expenses for received or closed shipments"
-                                  : "Add adjustment to this expense"
-                            }
                           >
                             Adjust
                           </Button>
@@ -387,7 +369,7 @@ export default function ShipmentDetailPage() {
 
                         {expense.adjustments && expense.adjustments.length > 0 && (
                           <Collapsible>
-                            <CollapsibleTrigger className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+                            <CollapsibleTrigger className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground">
                               <ChevronDown className="h-4 w-4" />
                               Adjustments History ({expense.adjustments.length})
                             </CollapsibleTrigger>
@@ -404,7 +386,7 @@ export default function ShipmentDetailPage() {
                                           variant={Number.parseFloat(adjustment.amount) > 0 ? "default" : "destructive"}
                                           className="text-xs"
                                         >
-                                          {Number.parseFloat(adjustment.amount) > 0 ? "+" : ""}ETB 
+                                          {Number.parseFloat(adjustment.amount) > 0 ? "+" : ""}ETB{" "}
                                           {Number.parseFloat(adjustment.amount).toFixed(2)}
                                         </Badge>
                                         {adjustment.reason && (
@@ -429,9 +411,7 @@ export default function ShipmentDetailPage() {
                   <div className="pt-4 border-t">
                     <div className="flex items-center justify-between text-lg font-semibold">
                       <span>Total Expenses (with adjustments):</span>
-                      <span className="font-bold text-xl">
-                        ETB { totalExpenses.toFixed(2)}
-                      </span>
+                      <span className="font-bold text-xl">{formatCurrency(Number(totalExpenses ?? 0), 'ETB')}</span>
                     </div>
                   </div>
                 </div>

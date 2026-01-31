@@ -58,11 +58,12 @@ export function CommissionRuleTable() {
             className="pl-9"
           />
         </div>
-        {hasPermission('commission-rule:create') && (
+        {hasPermission("commission-rule:create") && (
           <Button onClick={handleAddNew}>
             <Plus className="h-4 w-4 mr-2" />
             Add Rule
-          </Button>)}
+          </Button>
+        )}
       </div>
 
       <div className="rounded-lg border bg-card">
@@ -122,14 +123,21 @@ export function CommissionRuleTable() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        {hasPermission("commission-rule:update") && (<DropdownMenuItem onClick={() => handleEdit(rule)}>
-                          <Pencil className="h-4 w-4 mr-2" />
-                          Edit
-                        </DropdownMenuItem>)}
-                        {hasPermission("commission-rule:delete") && (<DropdownMenuItem onClick={() => handleDelete(rule.id)} className="text-destructive">
-                          <Trash2 className="h-4 w-4 mr-2" />
-                          Delete
-                        </DropdownMenuItem>)}
+                        {hasPermission("commission-rule:update") && (
+                          <DropdownMenuItem onClick={() => handleEdit(rule)}>
+                            <Pencil className="h-4 w-4 mr-2" />
+                            Edit
+                          </DropdownMenuItem>
+                        )}
+                        {hasPermission("commission-rule:delete") && (
+                          <DropdownMenuItem
+                            onClick={() => handleDelete(rule.id)}
+                            className="text-destructive"
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Delete
+                          </DropdownMenuItem>
+                        )}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>

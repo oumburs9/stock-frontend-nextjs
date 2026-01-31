@@ -44,12 +44,9 @@ class UserService {
   }
 
   async getUser(id: string): Promise<User | null> {
-    try {
       const response = await axiosInstance.get<User>(API_ENDPOINTS.users.detail(id))
       return response.data
-    } catch {
-      return null
-    }
+
   }
 
   async createUser(data: CreateUserRequest): Promise<User> {

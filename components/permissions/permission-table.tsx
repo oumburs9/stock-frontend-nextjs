@@ -18,12 +18,19 @@ import { ConfirmDeleteDialog } from "@/components/shared/confirm-delete-dialog"
 import { PermissionFormDialog } from "./permission-form-dialog"
 import type { Permission } from "@/lib/types/permission"
 import { useAuth } from "@/lib/hooks/use-auth"
+import type { AxiosError } from "axios"
+import { parseApiError } from "@/lib/api/parse-api-error"
+import { showApiErrorToast } from "@/lib/api/show-api-error-toast"
+import { useToast } from "@/hooks/use-toast"
 
 export function PermissionTable() {
   const [search, setSearch] = useState("")
   const [selectedPermission, setSelectedPermission] = useState<Permission | null>(null)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [permissionToDelete, setPermissionToDelete] = useState<Permission | null>(null)
+  const toast = useToast()
+  const [page, setPage] = useState(1)
+  const itemsPerPage = 10
 
   const { hasPermission } = useAuth()
   const { data: permissions, isLoading } = usePermissions()
@@ -35,25 +42,32 @@ export function PermissionTable() {
       permission.description?.toLowerCase().includes(search.toLowerCase()),
   )
 
+  const totalPages = Math.max(1, Math.ceil((filteredPermissions?.length ?? 0) / itemsPerPage))
+  const startIndex = (page - 1) * itemsPerPage
+  const paginatedPermissions = filteredPermissions?.slice(startIndex, startIndex + itemsPerPage)
+
   const handleEdit = (permission: Permission) => {
     setSelectedPermission(permission)
     setIsDialogOpen(true)
   }
 
-  // const handleDelete = (id: string) => {
-  //   if (confirm("Are you sure you want to delete this permission?")) {
-  //     deleteMutation.mutate(id)
-  //   }
-  // }
 
   const handleDelete = (permission: Permission) => {
     setPermissionToDelete(permission)
   }
 
   const confirmDelete = () => {
-    if (permissionToDelete) {
-      deleteMutation.mutate(permissionToDelete.id)
-    }
+    if (!permissionToDelete) return
+
+    deleteMutation.mutate(permissionToDelete.id, {
+      onSuccess: () => {
+        toast.success("Permission deleted", "The permission was deleted successfully.")
+        setPermissionToDelete(null)
+      },
+      onError: (e: AxiosError) =>{
+        console.log(e)
+        showApiErrorToast(parseApiError(e), toast, "Failed to delete permission.")}
+    })
   }
 
   return (
@@ -96,14 +110,14 @@ export function PermissionTable() {
                   Loading...
                 </TableCell>
               </TableRow>
-            ) : filteredPermissions?.length === 0 ? (
+            ) : paginatedPermissions?.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={3} className="text-center text-muted-foreground">
                   No permissions found
                 </TableCell>
               </TableRow>
             ) : (
-              filteredPermissions?.map((permission) => (
+              paginatedPermissions?.map((permission) => (
                 <TableRow key={permission.id}>
                   <TableCell className="font-medium font-mono">{permission.name}</TableCell>
                   <TableCell className="text-muted-foreground">{permission.description || "—"}</TableCell>
@@ -131,6 +145,29 @@ export function PermissionTable() {
           </TableBody>
         </Table>
       </div>
+
+      {filteredPermissions && filteredPermissions.length > itemsPerPage && (
+        <div className="flex items-center justify-between">
+          <p className="text-sm text-muted-foreground">
+            Showing {(page - 1) * itemsPerPage + 1}–
+            {Math.min(page * itemsPerPage, filteredPermissions.length)} of{" "}
+            {filteredPermissions.length}
+          </p>
+          <div className="flex gap-2">
+            <Button size="sm" variant="outline" disabled={page === 1} onClick={() => setPage(p => p - 1)}>
+              Previous
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={page * itemsPerPage >= filteredPermissions.length}
+              onClick={() => setPage(p => p + 1)}
+            >
+              Next
+            </Button>
+          </div>
+        </div>
+      )}
 
       <PermissionFormDialog permission={selectedPermission} open={isDialogOpen} onOpenChange={setIsDialogOpen} />
       <ConfirmDeleteDialog

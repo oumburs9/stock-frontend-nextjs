@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import type { AxiosError } from "axios"
 import { DashboardLayout } from "@/components/layout/dashboard-layout"
 import { TaxRulesTable } from "@/components/finance/tax/tax-rules-table"
 import { TaxRuleFormDialog } from "@/components/finance/tax/tax-rule-form-dialog"
@@ -14,6 +15,9 @@ import { useTaxConfig, useTaxRules, useUpsertTaxConfig } from "@/lib/hooks/use-f
 import { SearchableCombobox } from "@/components/shared/searchable-combobox"
 import { RequirePermission } from "@/components/auth/require-permission"
 import { useAuth } from "@/lib/hooks/use-auth"
+import { parseApiError } from "@/lib/api/parse-api-error"
+import { showApiErrorToast } from "@/lib/api/show-api-error-toast"
+import { useToast } from "@/hooks/use-toast"
 
 export default function TaxPage() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
@@ -21,22 +25,33 @@ export default function TaxPage() {
   const { data: taxRules } = useTaxRules()
   const { hasPermission } = useAuth()
   const upsertConfigMutation = useUpsertTaxConfig()
+  const toast = useToast()
 
   const isEnabled = taxConfig?.is_enabled || false
   const defaultTaxRuleId = taxConfig?.default_tax_rule_id || null
 
   const handleEnableChange = async (checked: boolean) => {
-    await upsertConfigMutation.mutateAsync({
-      isEnabled: checked,
-      defaultTaxRuleId: defaultTaxRuleId || null,
-    })
+    try {
+      await upsertConfigMutation.mutateAsync({
+        isEnabled: checked,
+        defaultTaxRuleId: defaultTaxRuleId || null,
+      })
+      toast.success("Tax configuration updated")
+    } catch (e) {
+      showApiErrorToast(parseApiError(e as AxiosError), toast)
+    }
   }
 
   const handleDefaultTaxRuleChange = async (value: string) => {
-    await upsertConfigMutation.mutateAsync({
-      isEnabled,
-      defaultTaxRuleId: value || null,
-    })
+    try {
+      await upsertConfigMutation.mutateAsync({
+        isEnabled,
+        defaultTaxRuleId: value || null,
+      })
+      toast.success("Default tax rule updated")
+    } catch (e) {
+      showApiErrorToast(parseApiError(e as AxiosError), toast)
+    }
   }
 
   const taxRuleOptions =
@@ -70,7 +85,7 @@ export default function TaxPage() {
                   id="tax-enabled"
                   checked={isEnabled}
                   onCheckedChange={handleEnableChange}
-                  disabled={!hasPermission('tax-config:update') || upsertConfigMutation.isPending}
+                  disabled={!hasPermission("tax-config:update") || upsertConfigMutation.isPending}
                 />
               </div>
 
@@ -84,7 +99,7 @@ export default function TaxPage() {
                     placeholder="Select default tax rule..."
                     searchPlaceholder="Search tax rules..."
                     emptyMessage="No active tax rules found."
-                    disabled={!hasPermission('tax-config:update') || upsertConfigMutation.isPending}
+                    disabled={!hasPermission("tax-config:update") || upsertConfigMutation.isPending}
                   />
                   <p className="text-xs text-muted-foreground">
                     This tax rule will be automatically applied to new invoices
@@ -101,7 +116,7 @@ export default function TaxPage() {
                   <CardTitle>Tax Rules</CardTitle>
                   <CardDescription>Manage tax rates and validity periods</CardDescription>
                 </div>
-                {hasPermission('tax-rule:create') && (
+                {hasPermission("tax-rule:create") && (
                   <Button onClick={() => setIsCreateDialogOpen(true)}>
                     <Plus className="mr-2 h-4 w-4" />
                     Create Tax Rule

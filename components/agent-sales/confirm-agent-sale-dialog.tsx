@@ -7,10 +7,13 @@ import type { AgentSale } from "@/lib/types/agent-sales"
 import { useToast } from "@/hooks/use-toast"
 import { AlertCircle, CheckCircle, AlertTriangle } from "lucide-react"
 import { formatCurrency } from "@/lib/utils/currency"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
 import { useAuth } from "@/lib/hooks/use-auth"
+import type { AxiosError } from "axios"
+import { parseApiError } from "@/lib/api/parse-api-error"
+import { showApiErrorToast } from "@/lib/api/show-api-error-toast"
 
 interface ConfirmAgentSaleDialogProps {
   open: boolean
@@ -19,7 +22,7 @@ interface ConfirmAgentSaleDialogProps {
 }
 
 export function ConfirmAgentSaleDialog({ open, onOpenChange, agentSale }: ConfirmAgentSaleDialogProps) {
-  const { toast } = useToast()
+  const toast = useToast()
   const confirmAgentSale = useConfirmAgentSale()
   const { data: commissionRules = [] } = useCommissionRules()
   const [overrideRuleId, setOverrideRuleId] = useState<string>("")
@@ -33,6 +36,13 @@ export function ConfirmAgentSaleDialog({ open, onOpenChange, agentSale }: Confir
     : agentSale.commission_rule_id
       ? commissionRules.find((r) => r.id === agentSale.commission_rule_id)
       : undefined
+
+  useEffect(() => {
+    if (!open) {
+      setOverrideRuleId("")
+      setTypeValidationError("")
+    }
+  }, [open])
 
   const handleConfirm = () => {
     if (!hasPermission("agent-sale:confirm")) return
@@ -52,19 +62,12 @@ export function ConfirmAgentSaleDialog({ open, onOpenChange, agentSale }: Confir
       },
       {
         onSuccess: () => {
-          toast({
-            title: "Agent sale confirmed",
-            description: "The agent sale has been confirmed successfully.",
-          })
+          toast.success("Agent sale confirmed", "The agent sale has been confirmed successfully.")
           setOverrideRuleId("")
           onOpenChange(false)
         },
-        onError: (error: any) => {
-          toast({
-            title: "Error",
-            description: error?.message || "Failed to confirm agent sale. Please try again.",
-            variant: "destructive",
-          })
+        onError: (e: AxiosError) => {
+          showApiErrorToast(parseApiError(e), toast, "Failed to confirm agent sale. Please try again.")
         },
       },
     )
@@ -105,7 +108,13 @@ export function ConfirmAgentSaleDialog({ open, onOpenChange, agentSale }: Confir
           {/* Commission Rule Override */}
           <div className="space-y-2">
             <Label htmlFor="override-rule">Commission Rule Override (Optional)</Label>
-            <Select value={overrideRuleId} onValueChange={setOverrideRuleId}>
+            <Select
+              value={overrideRuleId ? overrideRuleId : "default"}
+              onValueChange={(value) => {
+                setOverrideRuleId(value === "default" ? "" : value)
+                setTypeValidationError("")
+              }}
+            >
               <SelectTrigger id="override-rule">
                 <SelectValue placeholder="Use current commission rule" />
               </SelectTrigger>

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import { MoreHorizontal, Plus, Search, Shield } from "lucide-react"
 import { useRoles, useDeleteRole } from "@/lib/hooks/use-roles"
 import { Button } from "@/components/ui/button"
@@ -20,6 +20,12 @@ import { RolePermissionsDialog } from "./role-permissions-dialog"
 import type { Role } from "@/lib/types/role"
 import { useRolePermissions } from "@/lib/hooks/use-roles"
 import { useAuth } from "@/lib/hooks/use-auth"
+import type { AxiosError } from "axios"
+import { parseApiError } from "@/lib/api/parse-api-error"
+import { showApiErrorToast } from "@/lib/api/show-api-error-toast"
+import { useToast } from "@/hooks/use-toast"
+
+const PAGE_SIZE = 10
 
 export function RoleTable() {
   const [search, setSearch] = useState("")
@@ -27,16 +33,32 @@ export function RoleTable() {
   const [isFormDialogOpen, setIsFormDialogOpen] = useState(false)
   const [isPermissionsDialogOpen, setIsPermissionsDialogOpen] = useState(false)
   const [roleToDelete, setRoleToDelete] = useState<Role | null>(null)
+  const [page, setPage] = useState(1)
+  const itemsPerPage = 10
 
   const { hasPermission } = useAuth()
-  const { data: roles, isLoading } = useRoles()
+  const { data: roles = [], isLoading } = useRoles()
   const deleteMutation = useDeleteRole()
+  const toast = useToast()
 
-  const filteredRoles = roles?.filter(
-    (role) =>
-      role.name.toLowerCase().includes(search.toLowerCase()) ||
-      role.description?.toLowerCase().includes(search.toLowerCase()),
-  )
+ const filteredRoles = useMemo(() => {
+    const q = search.toLowerCase()
+    return roles.filter(
+      (role) =>
+        role.name.toLowerCase().includes(q) ||
+        role.description?.toLowerCase().includes(q),
+    )
+  }, [roles, search])
+
+  const paginatedRoles = filteredRoles?.slice(
+  (page - 1) * itemsPerPage,
+  page * itemsPerPage,
+)
+
+  // // keep page valid when search changes
+  // if (page > totalPages) {
+  //   setPage(totalPages)
+  // }
 
   const handleEdit = (role: Role) => {
     setSelectedRole(role)
@@ -51,17 +73,20 @@ export function RoleTable() {
   const handleDelete = (role: Role) => {
       setRoleToDelete(role)
     }
-  // const handleDelete = (id: string) => {
-  //   if (confirm("Are you sure you want to delete this role?")) {
-  //     deleteMutation.mutate(id)
-  //   }
-  // }
 
-    const confirmDelete = () => {
-      if (roleToDelete) {
-        deleteMutation.mutate(roleToDelete.id)
-      }
-    }
+
+  const confirmDelete = () => {
+    if (!roleToDelete) return
+
+    deleteMutation.mutate(roleToDelete.id, {
+      onSuccess: () => {
+        toast.success("Role deleted", "The role was deleted successfully.")
+        setRoleToDelete(null)
+      },
+      onError: (e: AxiosError) =>
+        showApiErrorToast(parseApiError(e), toast, "Failed to delete role."),
+    })
+  }
 
   return (
     <div className="space-y-4">
@@ -103,14 +128,14 @@ export function RoleTable() {
                   Loading...
                 </TableCell>
               </TableRow>
-            ) : filteredRoles?.length === 0 ? (
+            ) : paginatedRoles?.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={4} className="text-center text-muted-foreground">
                   No roles found
                 </TableCell>
               </TableRow>
             ) : (
-              filteredRoles?.map((role) => (
+              paginatedRoles?.map((role) => (
                 <TableRow key={role.id}>
                   <TableCell className="font-medium font-mono">{role.name}</TableCell>
                   <TableCell className="text-muted-foreground">{role.description || "—"}</TableCell>
@@ -145,6 +170,29 @@ export function RoleTable() {
           </TableBody>
         </Table>
       </div>
+
+      {filteredRoles && filteredRoles.length > itemsPerPage && (
+        <div className="flex items-center justify-between">
+          <p className="text-sm text-muted-foreground">
+            Showing {(page - 1) * itemsPerPage + 1}–
+            {Math.min(page * itemsPerPage, filteredRoles.length)} of{" "}
+            {filteredRoles.length}
+          </p>
+          <div className="flex gap-2">
+            <Button size="sm" variant="outline" disabled={page === 1} onClick={() => setPage(p => p - 1)}>
+              Previous
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={page * itemsPerPage >= filteredRoles.length}
+              onClick={() => setPage(p => p + 1)}
+            >
+              Next
+            </Button>
+          </div>
+        </div>
+      )}
 
       <RoleFormDialog role={selectedRole} open={isFormDialogOpen} onOpenChange={setIsFormDialogOpen} />
       <RolePermissionsDialog

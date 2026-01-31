@@ -19,6 +19,10 @@ import { ConfirmDeleteDialog } from "@/components/shared/confirm-delete-dialog"
 import type { Shop } from "@/lib/types/inventory"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/lib/hooks/use-auth"
+import type { AxiosError } from "axios"
+import { parseApiError } from "@/lib/api/parse-api-error"
+import { showApiErrorToast } from "@/lib/api/show-api-error-toast"
+import { useToast } from "@/hooks/use-toast"
 
 export function ShopTable() {
   const [search, setSearch] = useState("")
@@ -26,15 +30,17 @@ export function ShopTable() {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [shopToDelete, setShopToDelete] = useState<Shop | null>(null)
   const [page, setPage] = useState(1)
-  const router = useRouter()
 
+  const router = useRouter()
+  const toast = useToast()
   const { hasPermission } = useAuth()
   const { data: shops, isLoading } = useShops()
   const deleteMutation = useDeleteShop()
 
   const filteredShops = shops?.filter(
     (s) =>
-      s.name.toLowerCase().includes(search.toLowerCase()) || s.address.toLowerCase().includes(search.toLowerCase()),
+      s.name.toLowerCase().includes(search.toLowerCase()) ||
+      s.address.toLowerCase().includes(search.toLowerCase()),
   )
 
   const itemsPerPage = 10
@@ -52,9 +58,16 @@ export function ShopTable() {
   }
 
   const confirmDelete = () => {
-    if (shopToDelete) {
-      deleteMutation.mutate(shopToDelete.id)
-    }
+    if (!shopToDelete) return
+
+    deleteMutation.mutate(shopToDelete.id, {
+      onSuccess: () => {
+        toast.success("Shop deleted", "The shop was deleted successfully.")
+        setShopToDelete(null)
+      },
+      onError: (e: AxiosError) =>
+        showApiErrorToast(parseApiError(e), toast, "Failed to delete shop."),
+    })
   }
 
   const handleViewDetails = (shopId: string) => {
@@ -85,7 +98,8 @@ export function ShopTable() {
           >
             <Plus className="h-4 w-4 mr-2" />
             Add Shop
-          </Button>)}
+          </Button>
+        )}
       </div>
 
       <div className="rounded-md border">
@@ -131,12 +145,25 @@ export function ShopTable() {
                       <DropdownMenuContent align="end">
                         <DropdownMenuLabel>Actions</DropdownMenuLabel>
                         <DropdownMenuSeparator />
-                        {hasPermission("shop:update") && (<DropdownMenuItem onClick={() => handleEdit(shop)}>Edit</DropdownMenuItem>)}
-                        {hasPermission("shop:view") && (<DropdownMenuItem onClick={() => handleViewDetails(shop.id)}>View Details</DropdownMenuItem>)}
+                        {hasPermission("shop:update") && (
+                          <DropdownMenuItem onClick={() => handleEdit(shop)}>
+                            Edit
+                          </DropdownMenuItem>
+                        )}
+                        {hasPermission("shop:view") && (
+                          <DropdownMenuItem onClick={() => handleViewDetails(shop.id)}>
+                            View Details
+                          </DropdownMenuItem>
+                        )}
                         <DropdownMenuSeparator />
-                        {hasPermission("shop:delete") && (<DropdownMenuItem onClick={() => handleDelete(shop)} className="text-destructive">
-                          Delete
-                        </DropdownMenuItem>)}
+                        {hasPermission("shop:delete") && (
+                          <DropdownMenuItem
+                            onClick={() => handleDelete(shop)}
+                            className="text-destructive"
+                          >
+                            Delete
+                          </DropdownMenuItem>
+                        )}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>
@@ -150,11 +177,17 @@ export function ShopTable() {
       {filteredShops && filteredShops.length > itemsPerPage && (
         <div className="flex items-center justify-between">
           <p className="text-sm text-muted-foreground">
-            Showing {startIndex + 1} to {Math.min(startIndex + itemsPerPage, filteredShops.length)} of{" "}
+            Showing {startIndex + 1} to{" "}
+            {Math.min(startIndex + itemsPerPage, filteredShops.length)} of{" "}
             {filteredShops.length} shops
           </p>
           <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={() => setPage(Math.max(1, page - 1))} disabled={page === 1}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage(Math.max(1, page - 1))}
+              disabled={page === 1}
+            >
               <ChevronLeft className="h-4 w-4" />
             </Button>
             <div className="flex items-center gap-1">
@@ -183,6 +216,7 @@ export function ShopTable() {
       )}
 
       <ShopFormDialog shop={selectedShop} open={isDialogOpen} onOpenChange={setIsDialogOpen} />
+
       <ConfirmDeleteDialog
         open={!!shopToDelete}
         onOpenChange={(open) => !open && setShopToDelete(null)}

@@ -1,9 +1,7 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useForm } from "react-hook-form"
-import { zodResolver } from "@hookform/resolvers/zod"
-import * as z from "zod"
 import { useRouter } from "next/navigation"
 import {
   Dialog,
@@ -26,19 +24,20 @@ import { usePartners } from "@/lib/hooks/use-partners"
 import { useProducts } from "@/lib/hooks/use-products"
 import { SearchableCombobox } from "@/components/shared/searchable-combobox"
 import { useAuth } from "@/lib/hooks/use-auth"
+import type { AxiosError } from "axios"
+import { parseApiError } from "@/lib/api/parse-api-error"
+import { showApiErrorToast } from "@/lib/api/show-api-error-toast"
 
-const formSchema = z.object({
-  code: z.string().min(1, "Code is required"),
-  customerId: z.string().min(1, "Customer is required"),
-  principalId: z.string().min(1, "Principal is required"),
-  saleDate: z.string().min(1, "Sale date is required"),
-  currency: z.string().min(1, "Currency is required"),
-  commissionType: z.enum(["license_use", "principal_commission"]),
-  commissionRuleId: z.string().min(1, "Commission rule is required"),
-  notes: z.string().optional(),
-})
-
-type FormData = z.infer<typeof formSchema>
+type FormData = {
+  code: string
+  customerId: string
+  principalId: string
+  saleDate: string
+  currency: string
+  commissionType: "license_use" | "principal_commission"
+  commissionRuleId: string
+  notes?: string
+}
 
 interface AgentSaleFormDialogProps {
   open: boolean
@@ -53,7 +52,7 @@ interface ItemRow {
 
 export function AgentSaleFormDialog({ open, onOpenChange }: AgentSaleFormDialogProps) {
   const router = useRouter()
-  const { toast } = useToast()
+  const toast = useToast()
   const createMutation = useCreateAgentSale()
 
   const { data: commissionRules = [] } = useCommissionRules()
@@ -71,8 +70,9 @@ export function AgentSaleFormDialog({ open, onOpenChange }: AgentSaleFormDialogP
     reset,
     watch,
     setValue,
+    setError,
+    clearErrors,
   } = useForm<FormData>({
-    resolver: zodResolver(formSchema),
     defaultValues: {
       code: `AG-${Date.now()}`,
       customerId: "",
@@ -85,6 +85,23 @@ export function AgentSaleFormDialog({ open, onOpenChange }: AgentSaleFormDialogP
     },
   })
 
+  useEffect(() => {
+    if (!open) {
+      reset({
+        code: `AG-${Date.now()}`,
+        customerId: "",
+        principalId: "",
+        saleDate: new Date().toISOString().split("T")[0],
+        currency: "ETB",
+        commissionType: "license_use",
+        commissionRuleId: "",
+        notes: "",
+      })
+      setItems([{ productId: "", quantity: "1", grossUnitPrice: "0" }])
+      clearErrors()
+    }
+  }, [open, reset, clearErrors])
+
   const commissionType = watch("commissionType")
   const currency = watch("currency")
   const commissionRuleId = watch("commissionRuleId")
@@ -95,7 +112,7 @@ export function AgentSaleFormDialog({ open, onOpenChange }: AgentSaleFormDialogP
   const principalOptions = suppliers.map((s) => ({ value: s.id, label: s.name }))
   const productOptions = products.map((p) => ({ value: p.id, label: `${p.name} (${p.sku})` }))
   const commissionRuleOptions = commissionRules
-    .filter((rule) => rule.is_active)
+    .filter((rule) => rule.is_active && rule.commission_type === commissionType)
     .map((rule) => ({
       value: rule.id,
       label: `${rule.name} (${rule.value}% - ${rule.commission_type})`,
@@ -136,65 +153,66 @@ export function AgentSaleFormDialog({ open, onOpenChange }: AgentSaleFormDialogP
   const commissionAmount = calculateCommission()
   const netPrincipalTotal = grossTotal - commissionAmount
 
-  const onSubmit = async (data: FormData) => {
+  const onSubmit = (data: FormData) => {
     if (!hasPermission("agent-sale:create")) return
+
     const validItems = items.filter((item) => item.productId && item.quantity && item.grossUnitPrice)
 
     if (validItems.length === 0) {
-      toast({
-        title: "Error",
-        description: "Please add at least one item",
-        variant: "destructive",
-      })
+      setError("code", { message: "Please add at least one item" })
       return
     }
 
-    try {
-      const result = await createMutation.mutateAsync({
+    createMutation.mutate(
+      {
         ...data,
         items: validItems.map((item) => ({
           productId: item.productId,
           quantity: item.quantity,
           grossUnitPrice: item.grossUnitPrice,
         })),
-      })
+      },
+      {
+        onSuccess: (result) => {
+          toast.success("Agent sale created", `Agent sale ${result.code} has been created successfully.`)
+          onOpenChange(false)
+          router.push(`/agent-sales/${result.id}`)
+        },
+        onError: (e: AxiosError) => {
+          const parsed = parseApiError(e)
 
-      toast({
-        title: "Agent sale created",
-        description: `Agent sale ${result.code} has been created successfully.`,
-      })
+          if (parsed.type === "validation") {
+            Object.entries(parsed.fieldErrors).forEach(([field, message]) => {
+              setError(field as keyof FormData, { message })
+            })
+            return
+          }
 
-      onOpenChange(false)
-      router.push(`/agent-sales/${result.id}`)
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.response?.data?.message || "Failed to create agent sale",
-        variant: "destructive",
-      })
-    }
+          showApiErrorToast(parsed, toast, "Failed to create agent sale")
+        },
+      },
+    )
   }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[900px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Create Agent Sale</DialogTitle>
           <DialogDescription>Create a new agent sale transaction</DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-          {/* Header Information */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="code">Sale Code</Label>
-              <Input id="code" {...register("code")} />
+              <Input id="code" {...register("code")} onChange={(e) => { setValue("code", e.target.value); clearErrors("code") }} />
               {errors.code && <p className="text-sm text-destructive">{errors.code.message}</p>}
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="saleDate">Sale Date</Label>
-              <Input id="saleDate" type="date" {...register("saleDate")} />
+              <Input id="saleDate" type="date" {...register("saleDate")} onChange={(e) => { setValue("saleDate", e.target.value); clearErrors("saleDate") }} />
               {errors.saleDate && <p className="text-sm text-destructive">{errors.saleDate.message}</p>}
             </div>
           </div>
@@ -204,7 +222,10 @@ export function AgentSaleFormDialog({ open, onOpenChange }: AgentSaleFormDialogP
               <Label htmlFor="customerId">Customer</Label>
               <SearchableCombobox
                 value={watch("customerId")}
-                onChange={(value) => setValue("customerId", value)}
+                onChange={(value) => {
+                  setValue("customerId", value)
+                  clearErrors("customerId")
+                }}
                 options={customerOptions}
                 placeholder="Select customer..."
               />
@@ -215,7 +236,10 @@ export function AgentSaleFormDialog({ open, onOpenChange }: AgentSaleFormDialogP
               <Label htmlFor="principalId">Principal</Label>
               <SearchableCombobox
                 value={watch("principalId")}
-                onChange={(value) => setValue("principalId", value)}
+                onChange={(value) => {
+                  setValue("principalId", value)
+                  clearErrors("principalId")
+                }}
                 options={principalOptions}
                 placeholder="Select principal..."
               />
@@ -226,13 +250,21 @@ export function AgentSaleFormDialog({ open, onOpenChange }: AgentSaleFormDialogP
           <div className="grid grid-cols-3 gap-4">
             <div className="space-y-2">
               <Label htmlFor="currency">Currency</Label>
-              <Input id="currency" {...register("currency")} />
+              <Input id="currency" {...register("currency")} onChange={(e) => { setValue("currency", e.target.value); clearErrors("currency") }} />
               {errors.currency && <p className="text-sm text-destructive">{errors.currency.message}</p>}
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="commissionType">Commission Type</Label>
-              <Select value={commissionType} onValueChange={(value) => setValue("commissionType", value as any)}>
+              <Select
+                value={commissionType}
+                onValueChange={(value) => {
+                  setValue("commissionType", value as any)
+                  setValue("commissionRuleId", "")
+                  clearErrors("commissionType")
+                  clearErrors("commissionRuleId")
+                }}
+              >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -245,7 +277,13 @@ export function AgentSaleFormDialog({ open, onOpenChange }: AgentSaleFormDialogP
 
             <div className="space-y-2">
               <Label htmlFor="commissionRuleId">Commission Rule</Label>
-              <Select value={commissionRuleId} onValueChange={(value) => setValue("commissionRuleId", value)}>
+              <Select
+                value={commissionRuleId}
+                onValueChange={(value) => {
+                  setValue("commissionRuleId", value)
+                  clearErrors("commissionRuleId")
+                }}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Select commission rule..." />
                 </SelectTrigger>
@@ -272,7 +310,6 @@ export function AgentSaleFormDialog({ open, onOpenChange }: AgentSaleFormDialogP
             <Textarea id="notes" {...register("notes")} rows={2} />
           </div>
 
-          {/* Items Section */}
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <Label>Items</Label>

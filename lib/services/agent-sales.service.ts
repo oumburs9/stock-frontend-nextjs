@@ -206,26 +206,14 @@ class CommissionRuleService {
 }
 
 class AgentSaleService {
-  async getAgentSales(params?: { q?: string; status?: string }): Promise<AgentSale[]> {
-    if (USE_MOCK_DATA) {
-      await new Promise((resolve) => setTimeout(resolve, 500))
-      let filtered = [...mockAgentSales]
-
-      if (params?.q) {
-        const search = params.q.toLowerCase()
-        filtered = filtered.filter((sale) => sale.code.toLowerCase().includes(search))
-      }
-
-      if (params?.status) {
-        filtered = filtered.filter((sale) => sale.status === params.status)
-      }
-
-      return filtered
+  async getAgentSales(params?: {
+      q?: string
+      status?: string
+      payable_id?: string
+    }): Promise<AgentSale[]> {
+      const response = await axiosInstance.get<AgentSale[]>("/agent-sales", { params })
+      return response.data
     }
-
-    const response = await axiosInstance.get<AgentSale[]>("/agent-sales", { params })
-    return response.data
-  }
 
   async getAgentSale(id: string): Promise<AgentSale> {
     if (USE_MOCK_DATA) {

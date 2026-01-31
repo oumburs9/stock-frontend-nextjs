@@ -17,6 +17,10 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import type { User } from "@/lib/types/user"
+import type { AxiosError } from "axios"
+import { parseApiError } from "@/lib/api/parse-api-error"
+import { showApiErrorToast } from "@/lib/api/show-api-error-toast"
+import { useToast } from "@/hooks/use-toast"
 
 interface UserRolesDialogProps {
   user: User | null
@@ -30,6 +34,7 @@ export function UserRolesDialog({ user, open, onOpenChange }: UserRolesDialogPro
 
   const { data: allRoles } = useRoles()
   const updateMutation = useUpdateUserRoles()
+  const toast = useToast()
 
   useEffect(() => {
    if (user && user.roles) {
@@ -51,19 +56,19 @@ export function UserRolesDialog({ user, open, onOpenChange }: UserRolesDialogPro
   }
 
   const handleSubmit = () => {
-    if (user) {
-      updateMutation.mutate(
-        {
-          id: user.id,
-          roleIds: selectedRoles,
+    if (!user) return
+
+    updateMutation.mutate(
+      { id: user.id, roleIds: selectedRoles },
+      {
+        onSuccess: () => {
+          toast.success("Roles updated", "User roles were updated successfully.")
+          onOpenChange(false)
         },
-        {
-          onSuccess: () => {
-            onOpenChange(false)
-          },
-        },
-      )
-    }
+        onError: (e: AxiosError) =>
+          showApiErrorToast(parseApiError(e), toast, "Failed to update roles."),
+      },
+    )
   }
 
   return (

@@ -1,18 +1,23 @@
 "use client"
 
+import type { AxiosError } from "axios"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { shopService } from "@/lib/services/shop.service"
-import type { CreateShopRequest, UpdateShopRequest } from "@/lib/types/inventory"
+import type {
+  Shop,
+  CreateShopRequest,
+  UpdateShopRequest,
+} from "@/lib/types/inventory"
 
 export function useShops() {
-  return useQuery({
+  return useQuery<Shop[], AxiosError>({
     queryKey: ["shops"],
     queryFn: () => shopService.getShops({ limit: 1000 }),
   })
 }
 
 export function useShop(id: string | null) {
-  return useQuery({
+  return useQuery<Shop | null, AxiosError>({
     queryKey: ["shops", id],
     queryFn: () => (id ? shopService.getShop(id) : null),
     enabled: !!id,
@@ -22,8 +27,8 @@ export function useShop(id: string | null) {
 export function useCreateShop() {
   const queryClient = useQueryClient()
 
-  return useMutation({
-    mutationFn: (data: CreateShopRequest) => shopService.createShop(data),
+  return useMutation<Shop, AxiosError, CreateShopRequest>({
+    mutationFn: (data) => shopService.createShop(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["shops"] })
     },
@@ -33,8 +38,8 @@ export function useCreateShop() {
 export function useUpdateShop() {
   const queryClient = useQueryClient()
 
-  return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: UpdateShopRequest }) => shopService.updateShop(id, data),
+  return useMutation<void, AxiosError, { id: string; data: UpdateShopRequest }>({
+    mutationFn: ({ id, data }) => shopService.updateShop(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["shops"] })
     },
@@ -44,8 +49,8 @@ export function useUpdateShop() {
 export function useDeleteShop() {
   const queryClient = useQueryClient()
 
-  return useMutation({
-    mutationFn: (id: string) => shopService.deleteShop(id),
+  return useMutation<void, AxiosError, string>({
+    mutationFn: (id) => shopService.deleteShop(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["shops"] })
     },

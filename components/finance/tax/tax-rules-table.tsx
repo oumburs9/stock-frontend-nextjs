@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import type { AxiosError } from "axios"
 import { MoreHorizontal, Pencil, Trash, ChevronLeft, ChevronRight } from "lucide-react"
 import { useTaxRules, useDeleteTaxRule } from "@/lib/hooks/use-finance"
 import { Button } from "@/components/ui/button"
@@ -27,6 +28,9 @@ import { Badge } from "@/components/ui/badge"
 import { TaxRuleFormDialog } from "./tax-rule-form-dialog"
 import type { TaxRule } from "@/lib/types/finance"
 import { useAuth } from "@/lib/hooks/use-auth"
+import { parseApiError } from "@/lib/api/parse-api-error"
+import { showApiErrorToast } from "@/lib/api/show-api-error-toast"
+import { useToast } from "@/hooks/use-toast"
 
 export function TaxRulesTable() {
   const [page, setPage] = useState(1)
@@ -37,6 +41,7 @@ export function TaxRulesTable() {
   const { hasPermission } = useAuth()
   const { data: taxRules, isLoading } = useTaxRules()
   const deleteMutation = useDeleteTaxRule()
+  const toast = useToast()
 
   const itemsPerPage = 10
   const startIndex = (page - 1) * itemsPerPage
@@ -48,11 +53,18 @@ export function TaxRulesTable() {
     setIsDialogOpen(true)
   }
 
-  const handleDelete = async () => {
-    if (ruleToDelete) {
-      await deleteMutation.mutateAsync(ruleToDelete.id)
-      setRuleToDelete(null)
-    }
+  const handleDelete = () => {
+    if (!ruleToDelete) return
+
+    deleteMutation
+      .mutateAsync(ruleToDelete.id)
+      .then(() => {
+        toast.success("Tax rule deleted")
+        setRuleToDelete(null)
+      })
+      .catch((e: AxiosError) => {
+        showApiErrorToast(parseApiError(e), toast, "Failed to delete tax rule.")
+      })
   }
 
   return (
@@ -106,15 +118,22 @@ export function TaxRulesTable() {
                       <DropdownMenuContent align="end">
                         <DropdownMenuLabel>Actions</DropdownMenuLabel>
                         <DropdownMenuSeparator />
-                        {hasPermission('tax-rule:update') && (<DropdownMenuItem onClick={() => handleEdit(rule)}>
-                          <Pencil className="h-4 w-4 mr-2" />
-                          Edit
-                        </DropdownMenuItem>)}
+                        {hasPermission("tax-rule:update") && (
+                          <DropdownMenuItem onClick={() => handleEdit(rule)}>
+                            <Pencil className="h-4 w-4 mr-2" />
+                            Edit
+                          </DropdownMenuItem>
+                        )}
                         <DropdownMenuSeparator />
-                        {hasPermission('tax-rule:delete') && (<DropdownMenuItem onClick={() => setRuleToDelete(rule)} className="text-destructive">
-                          <Trash className="h-4 w-4 mr-2" />
-                          Delete
-                        </DropdownMenuItem>)}
+                        {hasPermission("tax-rule:delete") && (
+                          <DropdownMenuItem
+                            onClick={() => setRuleToDelete(rule)}
+                            className="text-destructive"
+                          >
+                            <Trash className="h-4 w-4 mr-2" />
+                            Delete
+                          </DropdownMenuItem>
+                        )}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>

@@ -2,8 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useForm } from "react-hook-form"
-import { zodResolver } from "@hookform/resolvers/zod"
-import * as z from "zod"
+import type { AxiosError } from "axios"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -21,13 +20,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Plus, Trash2, AlertCircle, Info } from "lucide-react"
 import { useAuth } from "@/lib/hooks/use-auth"
+import { parseApiError } from "@/lib/api/parse-api-error"
+import { showApiErrorToast } from "@/lib/api/show-api-error-toast"
 
-const formSchema = z.object({
-  commission_rule_id: z.string().optional(),
-  notes: z.string().optional(),
-})
-
-type FormData = z.infer<typeof formSchema>
+interface FormData {
+  commission_rule_id?: string
+  notes?: string
+}
 
 interface ItemRow {
   productId: string
@@ -42,7 +41,7 @@ interface EditAgentSaleDialogProps {
 }
 
 export function EditAgentSaleDialog({ open, onOpenChange, agentSale }: EditAgentSaleDialogProps) {
-  const { toast } = useToast()
+  const toast = useToast()
   const updateAgentSale = useUpdateAgentSale()
   const { data: commissionRules = [] } = useCommissionRules()
   const { data: products = [] } = useProducts()
@@ -50,15 +49,18 @@ export function EditAgentSaleDialog({ open, onOpenChange, agentSale }: EditAgent
 
   const [items, setItems] = useState<ItemRow[]>([])
   const [activeTab, setActiveTab] = useState("info")
+  const [formError, setFormError] = useState<string | null>(null)
 
   const {
     register,
     handleSubmit,
     reset,
     watch,
-    formState: { errors, isDirty },
+    setValue,
+    setError,
+    clearErrors,
+    formState: { errors },
   } = useForm<FormData>({
-    resolver: zodResolver(formSchema),
     defaultValues: {
       commission_rule_id: agentSale.commission_rule_id || "",
       notes: agentSale.notes || "",
@@ -66,10 +68,10 @@ export function EditAgentSaleDialog({ open, onOpenChange, agentSale }: EditAgent
   })
 
   const commissionRuleId = watch("commission_rule_id")
-  const notes = watch("notes")
 
   useEffect(() => {
     if (open) {
+      setFormError(null)
       reset({
         commission_rule_id: agentSale.commission_rule_id || "",
         notes: agentSale.notes || "",
@@ -81,8 +83,10 @@ export function EditAgentSaleDialog({ open, onOpenChange, agentSale }: EditAgent
           grossUnitPrice: item.gross_unit_price,
         })) || [{ productId: "", quantity: "1", grossUnitPrice: "0" }],
       )
+      setActiveTab("info")
+      clearErrors()
     }
-  }, [open, agentSale, reset])
+  }, [open, agentSale, reset, clearErrors])
 
   const selectedRule = commissionRules.find((rule) => rule.id === commissionRuleId)
   const productOptions = products.map((p) => ({ value: p.id, label: `${p.name} (${p.sku})` }))
@@ -111,19 +115,26 @@ export function EditAgentSaleDialog({ open, onOpenChange, agentSale }: EditAgent
     }, 0)
   }
 
+  const handleOpenChange = (nextOpen: boolean) => {
+    onOpenChange(nextOpen)
+    if (!nextOpen) {
+      setFormError(null)
+      reset({
+        commission_rule_id: agentSale.commission_rule_id || "",
+        notes: agentSale.notes || "",
+      })
+      setItems([{ productId: "", quantity: "1", grossUnitPrice: "0" }])
+      setActiveTab("info")
+      clearErrors()
+    }
+  }
+
   const onSubmit = (data: FormData) => {
     if (!hasPermission("agent-sale:update")) return
-    const validItems = items.filter((item) => item.productId && item.quantity && item.grossUnitPrice)
 
-    // Validation
-    if (activeTab === "items" && validItems.length === 0) {
-      toast({
-        title: "Validation Error",
-        description: "Agent sale must have at least one item with all required fields filled.",
-        variant: "destructive",
-      })
-      return
-    }
+    setFormError(null)
+
+    const validItems = items.filter((item) => item.productId && item.quantity && item.grossUnitPrice)
 
     const updateData: any = {}
 
@@ -150,19 +161,21 @@ export function EditAgentSaleDialog({ open, onOpenChange, agentSale }: EditAgent
       },
       {
         onSuccess: () => {
-          toast({
-            title: "Success",
-            description: "Agent sale updated successfully.",
-          })
-          onOpenChange(false)
+          toast.success("Agent sale updated", "The agent sale was updated successfully.")
+          handleOpenChange(false)
         },
-        onError: (error: any) => {
-          const errorMessage = error.response?.data?.message || "Failed to update agent sale."
-          toast({
-            title: "Error Updating Agent Sale",
-            description: errorMessage,
-            variant: "destructive",
-          })
+        onError: (e: AxiosError) => {
+          const parsed = parseApiError(e)
+
+          if (parsed.type === "validation") {
+            Object.entries(parsed.fieldErrors).forEach(([field, message]) => {
+              setError(field as keyof FormData, { message })
+            })
+            if (parsed.formError) setFormError(parsed.formError)
+            return
+          }
+
+          showApiErrorToast(parsed, toast, "Failed to update agent sale.")
         },
       },
     )
@@ -170,8 +183,8 @@ export function EditAgentSaleDialog({ open, onOpenChange, agentSale }: EditAgent
 
   return (
     <>
-      <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+      <Dialog open={open} onOpenChange={handleOpenChange}>
+        <DialogContent className="sm:max-w-[900px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit Agent Sale - {agentSale.code}</DialogTitle>
           </DialogHeader>
@@ -183,6 +196,12 @@ export function EditAgentSaleDialog({ open, onOpenChange, agentSale }: EditAgent
             </AlertDescription>
           </Alert>
 
+          {formError && (
+            <div className="rounded-md border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">
+              {formError}
+            </div>
+          )}
+
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList>
               <TabsTrigger value="info">Sale Information</TabsTrigger>
@@ -190,7 +209,6 @@ export function EditAgentSaleDialog({ open, onOpenChange, agentSale }: EditAgent
             </TabsList>
 
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-              {/* Sale Information Tab */}
               <TabsContent value="info" className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="code">Sale Code</Label>
@@ -201,7 +219,10 @@ export function EditAgentSaleDialog({ open, onOpenChange, agentSale }: EditAgent
                   <Label htmlFor="commission_rule_id">Commission Rule</Label>
                   <Select
                     value={commissionRuleId}
-                    onValueChange={(value) => register("commission_rule_id").onChange({ target: { value } })}
+                    onValueChange={(value) => {
+                      setValue("commission_rule_id", value, { shouldDirty: true })
+                      clearErrors("commission_rule_id")
+                    }}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Select a commission rule" />
@@ -233,7 +254,17 @@ export function EditAgentSaleDialog({ open, onOpenChange, agentSale }: EditAgent
 
                 <div className="space-y-2">
                   <Label htmlFor="notes">Notes</Label>
-                  <Textarea id="notes" {...register("notes")} rows={4} placeholder="Add notes about this sale..." />
+                  <Textarea
+                    id="notes"
+                    {...register("notes", {
+                      onChange: (e) => {
+                        register("notes").onChange(e)
+                        clearErrors("notes")
+                      },
+                    })}
+                    rows={4}
+                    placeholder="Add notes about this sale..."
+                  />
                   {errors.notes && <p className="text-sm text-destructive">{errors.notes.message}</p>}
                 </div>
 
@@ -256,7 +287,6 @@ export function EditAgentSaleDialog({ open, onOpenChange, agentSale }: EditAgent
                 </div>
               </TabsContent>
 
-              {/* Items Tab */}
               <TabsContent value="items" className="space-y-4">
                 <div className="flex items-center justify-between">
                   <Label>Sale Items</Label>
@@ -342,9 +372,8 @@ export function EditAgentSaleDialog({ open, onOpenChange, agentSale }: EditAgent
                 </div>
               </TabsContent>
 
-              {/* Action Buttons */}
               <div className="flex justify-end gap-2">
-                <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                <Button type="button" variant="outline" onClick={() => handleOpenChange(false)}>
                   Cancel
                 </Button>
                 <Button type="submit" disabled={updateAgentSale.isPending}>

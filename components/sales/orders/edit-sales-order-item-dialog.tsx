@@ -1,7 +1,8 @@
 "use client"
 
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 import { useForm, useWatch } from "react-hook-form"
+import type { AxiosError } from "axios"
 import { useUpdateSalesOrderItem } from "@/lib/hooks/use-sales"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
@@ -11,6 +12,8 @@ import { useToast } from "@/hooks/use-toast"
 import { formatCurrency } from "@/lib/utils/currency"
 import type { UpdateSalesOrderItemRequest, SalesOrderItem } from "@/lib/types/sales"
 import { useAuth } from "@/lib/hooks/use-auth"
+import { parseApiError } from "@/lib/api/parse-api-error"
+import { showApiErrorToast } from "@/lib/api/show-api-error-toast"
 
 interface EditSalesOrderItemDialogProps {
   salesOrderId: string
@@ -19,16 +22,23 @@ interface EditSalesOrderItemDialogProps {
   onOpenChange: (open: boolean) => void
 }
 
-export function EditSalesOrderItemDialog({ salesOrderId, item, open, onOpenChange }: EditSalesOrderItemDialogProps) {
-  const { toast } = useToast()
+export function EditSalesOrderItemDialog({
+  salesOrderId,
+  item,
+  open,
+  onOpenChange,
+}: EditSalesOrderItemDialogProps) {
+  const toast = useToast()
   const updateItemMutation = useUpdateSalesOrderItem()
   const { hasPermission } = useAuth()
+  const [formError, setFormError] = useState<string | null>(null)
 
   const {
     register,
     handleSubmit,
     reset,
     setValue,
+    setError,
     control,
     formState: { errors },
   } = useForm<UpdateSalesOrderItemRequest>({
@@ -44,6 +54,8 @@ export function EditSalesOrderItemDialog({ salesOrderId, item, open, onOpenChang
   const discountPercent = useWatch({ control, name: "discountPercent" })
 
   useEffect(() => {
+    setFormError(null)
+
     if (item) {
       reset({
         // quantity: item.quantity,
@@ -59,10 +71,8 @@ export function EditSalesOrderItemDialog({ salesOrderId, item, open, onOpenChang
     let newUnitPrice = listPrice
 
     if (discountAmount && Number.parseFloat(discountAmount) > 0) {
-      // Apply discount amount
       newUnitPrice = listPrice - Number.parseFloat(discountAmount)
     } else if (discountPercent && Number.parseFloat(discountPercent) > 0) {
-      // Apply discount percent
       newUnitPrice = listPrice * (1 - Number.parseFloat(discountPercent) / 100)
     }
 
@@ -70,23 +80,29 @@ export function EditSalesOrderItemDialog({ salesOrderId, item, open, onOpenChang
   }, [discountAmount, discountPercent, item.list_price, setValue])
 
   const onSubmit = async (data: UpdateSalesOrderItemRequest) => {
+    setFormError(null)
+
     try {
       await updateItemMutation.mutateAsync({
         orderId: salesOrderId,
         itemId: item.id,
         data,
       })
-      toast({
-        title: "Success",
-        description: "Item updated successfully",
-      })
+
+      toast.success("Item updated successfully")
       onOpenChange(false)
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.response?.data?.message || "Failed to update item",
-        variant: "destructive",
-      })
+    } catch (e) {
+      const parsed = parseApiError(e as AxiosError)
+
+      if (parsed.type === "validation") {
+        Object.entries(parsed.fieldErrors).forEach(([field, message]) => {
+          setError(field as keyof UpdateSalesOrderItemRequest, { message })
+        })
+        if (parsed.formError) setFormError(parsed.formError)
+        return
+      }
+
+      showApiErrorToast(parsed, toast, "Failed to update item")
     }
   }
 
@@ -96,13 +112,22 @@ export function EditSalesOrderItemDialog({ salesOrderId, item, open, onOpenChang
         <DialogHeader>
           <DialogTitle>Edit Item Price</DialogTitle>
         </DialogHeader>
+
+        {formError && (
+          <div className="rounded-md border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">
+            {formError}
+          </div>
+        )}
+
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="space-y-2">
             <Label>Original List Price</Label>
-              <p className="text-sm text-muted-foreground">
-                Quantity cannot be changed after an item is added. Remove and re-add the item to change quantity.
-              </p>
-            <div className="text-2xl font-bold">{formatCurrency(Number.parseFloat(item.list_price))}</div>
+            <p className="text-sm text-muted-foreground">
+              Quantity cannot be changed after an item is added. Remove and re-add the item to change quantity.
+            </p>
+            <div className="text-2xl font-bold">
+              {formatCurrency(Number.parseFloat(item.list_price))}
+            </div>
           </div>
 
           {/* <div className="space-y-2">
@@ -111,9 +136,11 @@ export function EditSalesOrderItemDialog({ salesOrderId, item, open, onOpenChang
               id="quantity"
               type="number"
               step="0.01"
-              {...register("quantity", { required: "Quantity is required" })}
+              {...register("quantity")}
             />
-            {errors.quantity && <p className="text-sm text-destructive">{errors.quantity.message}</p>}
+            {errors.quantity?.message && (
+              <p className="text-sm text-destructive">{errors.quantity.message}</p>
+            )}
           </div> */}
 
           <div className="grid grid-cols-2 gap-4">
@@ -136,18 +163,25 @@ export function EditSalesOrderItemDialog({ salesOrderId, item, open, onOpenChang
               id="unitPrice"
               type="number"
               step="0.000001"
-              {...register("unitPrice", { required: "Unit price is required" })}
+              {...register("unitPrice")}
               className="font-mono text-lg"
             />
-            <p className="text-xs text-muted-foreground">Calculated automatically from discount, or enter manually</p>
-            {errors.unitPrice && <p className="text-sm text-destructive">{errors.unitPrice.message}</p>}
+            <p className="text-xs text-muted-foreground">
+              Calculated automatically from discount, or enter manually
+            </p>
+            {errors.unitPrice?.message && (
+              <p className="text-sm text-destructive">{errors.unitPrice.message}</p>
+            )}
           </div>
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={updateItemMutation.isPending || !hasPermission('sales-order-item:update')}>
+            <Button
+              type="submit"
+              disabled={updateItemMutation.isPending || !hasPermission("sales-order-item:update")}
+            >
               {updateItemMutation.isPending ? "Updating..." : "Update"}
             </Button>
           </DialogFooter>
