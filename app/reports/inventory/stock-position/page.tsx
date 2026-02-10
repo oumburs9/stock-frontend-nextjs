@@ -13,48 +13,80 @@ import { StockLevelChart } from "@/components/reports/charts/stock-level-chart"
 import { InventoryDistributionChart } from "@/components/reports/charts/inventory-distribution-chart"
 import { useStockPositionReport, useExportStockPosition } from "@/lib/hooks/use-reports"
 import type { StockPositionFilters } from "@/lib/types/report"
+import { useShops } from "@/lib/hooks/use-shops"
+import { useWarehouses } from "@/lib/hooks/use-warehouses"
 
 export default function StockPositionPage() {
   const [filters, setFilters] = useState<StockPositionFilters>({})
   const { data, isLoading, refetch } = useStockPositionReport(filters)
   const exportMutation = useExportStockPosition()
+  const { data: shops } = useShops()
+  const { data: warehouses } = useWarehouses()
 
   const totalProducts = data?.length || 0
   const totalOnHand = data?.reduce((sum, item) => sum + Number.parseFloat(item.on_hand_qty), 0) || 0
   const totalReserved = data?.reduce((sum, item) => sum + Number.parseFloat(item.reserved_qty), 0) || 0
   const lowStockItems = data?.filter((item) => Number.parseFloat(item.available_qty) < 10).length || 0
+  const shopMap = new Map(
+      (shops ?? []).map((shop) => [shop.id, shop.name])
+    )
+
+  const warehouseMap = new Map(
+      (warehouses ?? []).map((wh) => [wh.id, wh.name])
+    )
 
   const columns = [
     { key: "product_name", header: "Product Name" },
     {
-      key: "warehouse_id",
-      header: "Warehouse ID",
-      render: (value: string | null) => value || "N/A",
+      key: "location",
+      header: "Location",
+      render: (_: any, row: any) => {
+        if (row.shop_id) {
+          return (
+            <>
+              {shopMap.get(row.shop_id) ?? "Unknown Shop"}
+              <span className="ml-2 text-xs text-muted-foreground">(Shop)</span>
+            </>
+          )
+        }
+
+        if (row.warehouse_id) {
+          return (
+            <>
+              {warehouseMap.get(row.warehouse_id) ?? "Unknown Warehouse"}
+              <span className="ml-2 text-xs text-muted-foreground">(Warehouse)</span>
+            </>
+          )
+        }
+
+        return "—"
+      },
     },
-    {
-      key: "shop_id",
-      header: "Shop ID",
-      render: (value: string | null) => value || "N/A",
-    },
+
     {
       key: "on_hand_qty",
-      header: "On Hand Qty",
-      render: (value: string) => Number.parseFloat(value).toFixed(2),
+      header: "On Hand",
+      render: (v: string) => Number.parseFloat(v).toFixed(2),
     },
     {
       key: "reserved_qty",
-      header: "Reserved Qty",
-      render: (value: string) => Number.parseFloat(value).toFixed(2),
+      header: "Reserved",
+      render: (v: string) => Number.parseFloat(v).toFixed(2),
     },
     {
       key: "available_qty",
-      header: "Available Qty",
-      render: (value: string, row: any) => {
-        const qty = Number.parseFloat(value)
-        return <span className={qty < 10 ? "text-red-600 font-semibold" : ""}>{qty.toFixed(2)}</span>
+      header: "Available",
+      render: (v: string) => {
+        const qty = Number.parseFloat(v)
+        return (
+          <span className={qty < 10 ? "text-red-600 font-semibold" : ""}>
+            {qty.toFixed(2)}
+          </span>
+        )
       },
     },
   ]
+
 
   return (
     <DashboardLayout>
@@ -84,7 +116,7 @@ export default function StockPositionPage() {
           <div className="space-y-6 mb-6">
             <div className="grid gap-6 md:grid-cols-2">
               <StockLevelChart data={data} />
-              <InventoryDistributionChart data={data} />
+              <InventoryDistributionChart data={data} shops={shops}  warehouses={warehouses}/>
             </div>
           </div>
         )}

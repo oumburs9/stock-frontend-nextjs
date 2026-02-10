@@ -7,6 +7,14 @@ import type { StockPositionReport } from "@/lib/types/report"
 
 interface InventoryDistributionChartProps {
   data: StockPositionReport[]
+  shops: { id: string; name: string }[]
+  warehouses: { id: string; name: string }[]
+}
+
+type InventoryByLocation = {
+  key: string
+  label: string
+  value: number
 }
 
 const COLORS = [
@@ -17,13 +25,17 @@ const COLORS = [
   "hsl(var(--chart-5))",
 ]
 
-export function InventoryDistributionChart({ data }: InventoryDistributionChartProps) {
+export function InventoryDistributionChart({ data, shops =[], warehouses = [] }: InventoryDistributionChartProps) {
+
+ const shopMap = new Map(shops.map(s => [s.id, s.name]))
+ const warehouseMap = new Map(warehouses.map(w => [w.id, w.name]))
+
   if (!data || data.length === 0) {
     return (
       <Card>
         <CardHeader>
           <CardTitle>Inventory Distribution</CardTitle>
-          <CardDescription>Stock distribution across warehouses</CardDescription>
+          <CardDescription>Stock distribution across warehouses and shops</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="h-[300px] flex items-center justify-center text-muted-foreground">No data available</div>
@@ -33,43 +45,53 @@ export function InventoryDistributionChart({ data }: InventoryDistributionChartP
   }
 
   // Group by warehouse_id and calculate total available quantity
-  const chartData = data.reduce(
-    (acc, item) => {
-      const warehouseKey = item.warehouse_id || "Unknown"
-      const existing = acc.find((d) => d.name === warehouseKey)
+
+   const chartData = data.reduce<InventoryByLocation[]>((acc, item) => {
+      let key: string
+      let label: string
+
+      if (item.shop_id) {
+        key = `shop:${item.shop_id}`
+        label = shopMap.get(item.shop_id) ?? "Unknown Shop"
+      } else if (item.warehouse_id) {
+        key = `warehouse:${item.warehouse_id}`
+        label = warehouseMap.get(item.warehouse_id) ?? "Unknown Warehouse"
+      } else {
+        return acc
+      }
+
       const qty = Number.parseFloat(item.available_qty)
+      const existing = acc.find(d => d.key === key)
 
       if (existing) {
         existing.value += qty
       } else {
-        acc.push({
-          name: warehouseKey,
-          value: qty,
-        })
+        acc.push({ key, label, value: qty })
       }
+
       return acc
-    },
-    [] as Array<{ name: string; value: number }>,
-  )
+    }, [])
+
 
   return (
     <Card>
       <CardHeader>
         <CardTitle>Inventory Distribution</CardTitle>
-        <CardDescription>Stock distribution across warehouses</CardDescription>
+        <CardDescription>Stock distribution across warehouses and shops</CardDescription>
       </CardHeader>
       <CardContent>
         <ChartContainer
-          config={chartData.reduce(
-            (acc, item, index) => ({
-              ...acc,
-              [item.name]: {
-                label: item.name,
-                color: COLORS[index % COLORS.length],
-              },
-            }),
-            {},
-          )}
+         config={chartData.reduce(
+          (acc, item, index) => ({
+            ...acc,
+            [item.key]: {
+              label: item.label,
+              color: COLORS[index % COLORS.length],
+            },
+          }),
+          {} as Record<string, { label: string; color: string }>,
+        )}
+
           className="h-[300px]"
         >
           <PieChart>
@@ -80,8 +102,10 @@ export function InventoryDistributionChart({ data }: InventoryDistributionChartP
                   <div className="rounded-lg border bg-background p-2 shadow-sm">
                     <div className="grid gap-2">
                       <div className="flex flex-col">
-                        <span className="text-[0.70rem] uppercase text-muted-foreground">Warehouse</span>
-                        <span className="font-bold text-muted-foreground">{payload[0]?.name || "N/A"}</span>
+                        {/* <span className="text-[0.70rem] uppercase text-muted-foreground">Warehouse</span>
+                        <span className="font-bold text-muted-foreground">{payload[0]?.name || "N/A"}</span> */}
+                        <span className="text-[0.70rem] uppercase text-muted-foreground">Location</span>
+                        <span className="font-bold text-muted-foreground">{payload[0]?.payload?.label || "N/A"}</span>
                       </div>
                       <div className="flex flex-col">
                         <span className="text-[0.70rem] uppercase text-muted-foreground">Available Qty</span>
@@ -92,7 +116,7 @@ export function InventoryDistributionChart({ data }: InventoryDistributionChartP
                 )
               }}
             />
-            <Pie data={chartData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100} label>
+            <Pie data={chartData} dataKey="value" nameKey="label" cx="50%" cy="50%" outerRadius={100} label>
               {chartData.map((entry, index) => (
                 <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
               ))}

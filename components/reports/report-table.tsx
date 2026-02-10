@@ -27,6 +27,7 @@ export function ReportTable<T extends Record<string, any>>({ data, columns, isLo
       </div>
     )
   }
+  console.log("data: ", data)
 
   return (
     <div className="border rounded-lg">

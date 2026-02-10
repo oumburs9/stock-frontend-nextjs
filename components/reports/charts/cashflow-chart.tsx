@@ -29,7 +29,7 @@ export function CashflowChart({ data }: CashflowChartProps) {
   // Group by date and separate inflow/outflow
   const chartData = data.reduce(
     (acc, item) => {
-      const date = new Date(item.transaction_date).toLocaleDateString("en-US", { month: "short", day: "numeric" })
+      const date = new Date(item.payment_date).toLocaleDateString("en-US", { month: "short", day: "numeric" })
       const existing = acc.find((d) => d.date === date)
       const inflow = Number.parseFloat(item.inflow)
       const outflow = Number.parseFloat(item.outflow)
